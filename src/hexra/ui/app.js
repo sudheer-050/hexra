@@ -226,12 +226,13 @@ function render(keepScroll) {
   const tools = state.page !== "activity" || state.q ? h("div", { class: "tools" },
     h("input", { class: "search", type: "search", placeholder: "Search every setting…", value: state.q, "aria-label": "Search settings", id: "q" }),
     h("label", { class: "switch-row" }, h("button", { class: "toggle", role: "switch", "aria-checked": state.advanced ? "true" : "false", "aria-label": "Show advanced settings", onclick: () => { state.advanced = !state.advanced; persistAdv(); render(true); } }), "Advanced")) : null;
-  main.replaceChildren(h("div", { class: "page" }, page[0], page[1], tools, ...page.slice(2)));
+  main.replaceChildren(h("div", { class: "page" + (state.enter ? " enter" : "") }, page[0], page[1], tools, ...page.slice(2)));
   const q = $("#q");
   if (q) { const wasFocus = state.focusQ; q.addEventListener("input", () => { state.q = q.value.trim(); state.focusQ = true; render(true); }); if (wasFocus) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }
   state.focusQ = false;
   if (keepScroll) main.scrollTop = top;
   placeCamera(before);
+  state.enter = false;
   renderNav(); updateSave();
 }
 function persistAdv() { try { localStorage.setItem("hexra-advanced", state.advanced ? "1" : "0"); } catch (e) {} }
@@ -243,7 +244,7 @@ function renderNav() {
   const items = [["overview", "Overview", "home"], ...ordered.map(g => [g.id, g.label, g.icon]), ["activity", "Activity", "pulse"]];
   nav.replaceChildren(...items.map(([id, label, ic]) => {
     const n = id === "overview" || id === "activity" ? 0 : state.schema.groups.find(g => g.id === id).settings.filter(s => ch.includes(s.id)).length;
-    return h("button", { "aria-current": state.page === id && !state.q ? "page" : "false", onclick: () => { state.page = id; state.q = ""; render(false); main.scrollTop = 0; main.focus(); } }, SHORT[id] || label, n ? h("span", { class: "badge-n" }, n) : null);
+    return h("button", { "aria-current": state.page === id && !state.q ? "page" : "false", onclick: () => { state.page = id; state.q = ""; state.enter = true; render(false); main.scrollTop = 0; main.focus(); } }, SHORT[id] || label, n ? h("span", { class: "badge-n" }, n) : null);
   }));
 }
 function updateSave() {
@@ -332,6 +333,7 @@ window.addEventListener("pagehide", () => { try { navigator.sendBeacon("/api/clo
     state.schema = s.schema; state.saved = s.values; state.draft = JSON.parse(JSON.stringify(s.values)); state.defaults = s.defaults; state.info = s; state.eng = s.engine;
     const want = decodeURIComponent(location.hash.slice(1));
     if (want === "activity" || state.schema.groups.some(g => g.id === want)) state.page = want;
+    state.enter = true;
     render(false);
   } catch (e) { main.replaceChildren(h("div", { class: "page" }, h("h1", {}, "Settings could not load"), h("p", { class: "sub" }, e.message))); }
 })();

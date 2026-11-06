@@ -232,7 +232,7 @@ def make_handler(state: State):
                 state.seen_window = True
                 state.last_seen = time.time()
                 return self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
-            if url.path in ("/app.css", "/app.js", "/logo.png"):
+            if url.path in ("/app.css", "/app.js", "/fx.js", "/logo.png"):
                 f = UI_DIR / url.path[1:]
                 if f.exists():
                     ctype = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".png": "image/png"}[f.suffix]
