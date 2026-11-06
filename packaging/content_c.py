@@ -1,0 +1,224 @@
+"""Part 3: history, side projects, limits, tests, packaging, roadmap, glossary."""
+from reportlab.platypus import PageBreak
+
+from pdf_lib import AMBER, BODY, B, H1, H2, H3, P, SMALL, callout, code, table
+
+
+def phase(title, asked, found, did, status):
+    return [P(title, H2),
+            *table([["You asked / said", asked], ["What was wrong or learned", found], ["What was changed", did], ["How it was checked", status]],
+                   [34, 131], header=False, zebra=False)]
+
+
+def part3():
+    s = []
+    s += [PageBreak(), P("12. The full history: where it started and every change", H1)]
+    s += [P("This is the story in order, from your own words. Each phase says what you asked, what was wrong, what changed and how that was checked. "
+            "'Simulation' means a mathematical hand model, not your real hand. 'Confirmed by you' means you reported it working.")]
+    s += table([["Phase", "Topic", "Tests after"], ["0", "Setting up the first project (gesture-mouse)", "53"], ["1", "Mood from the face; the ASL idea", "-"],
+                ["2", "ASL fingerspelling project (separate)", "4"], ["3", "New project: gesture-control, first version", "9"],
+                ["4", "Controls reshaped three times", "13 to 15"], ["5", "Smoothing, air gate, speed", "16 to 25"],
+                ["6", "Drag cut-offs, lag measurement, multiple cursors question", "29 to 33"], ["7", "Scroll and right-click swap", "35"],
+                ["8", "Two cameras, then removed", "56 to 66, back to 35"], ["9", "Mouse-like movement and latency", "44"],
+                ["10", "Extra screens", "57"], ["11", "Precision, face lock, edge and line fixes", "61 to 78"], ["12", "Rotation and scroll-to-fist bugs", "80 to 83"],
+                ["13", "Window commands (discussed, not built); this guide and the installer", "83"],
+                ["14", "Choosing a name; the product becomes Hexra", "83"]], [18, 120, 27])
+
+    s += phase("Phase 0: the starting point - gesture-mouse",
+               "You shared a conversation and asked to read the project folder and complete its setup. After it was closed: 'tell me what to run'. "
+               "Then: 'it is tracking both hands, but it is not moving the cursor or doing anything'.",
+               "Installing from pyproject.toml failed with 'setup.py not found' because pip was too old. The newest pytest (9.2) crashed on Python 3.10.0. "
+               "The 'does nothing' report was the safe --dry-run mode (it only tracks and draws), and otherwise the program needed to be engaged.",
+               "Upgraded pip, installed the project into its own virtual environment, pinned pytest below 9 (8.4.2 works). All 53 tests passed. Run with: "
+               "python -m gesture_mouse (real) or --dry-run (safe).",
+               "Tests only; the webcam was not exercised by the assistant at that point.")
+    s += phase("Phase 1: ideas that did not become this program",
+               "'Can it understand my mood from my face?' and 'I want an app for deaf people ... braille ... ASL'.",
+               "Mood: possible with MediaPipe's face landmarker (478 points and about 52 expression scores) but a weaker, more culturally variable signal than hands - decide the use first. "
+               "Braille is a touch alphabet for blind people; the visual language for deaf people is ASL. Full conversational ASL is an open research problem (grammar uses the face, "
+               "head, body and space), so fingerspelling A-Z came first.",
+               "Nothing built for mood. ASL became its own project (next phase).",
+               "Discussion only.")
+    s += phase("Phase 2: asl-fingerspell (a separate project, still on disk)",
+               "'Start with American'; 'only text for now'; 'use existing datasets'; 'tell me the space first'; 'it is not recognising properly'; "
+               "'make it match my hand'; 'the letters move so fast, I do not know sign language'; 'will others need to train?'",
+               "Public photos (Kaggle ASL Alphabet, 1.1 GB, one signer mostly) give landmarks via MediaPipe, but a model trained only on them scored 71.5% on your hand (kNN 55.1%). "
+               "The first calibration ran too fast and showed no pictures.",
+               "Built collect / calibrate / train / live / import_images. Downloaded the dataset only after your explicit approval (1.10 GB), extracted a subset with Python (tar could not read "
+               "the zip), imported 22,473 landmark rows (1,000 per static letter), added augmentation, added skeleton drawing and an always-visible prediction to the live window, "
+               "rebuilt calibration to show a reference photo per letter and wait for SPACE. Final model: public data plus 720 samples of your hand across 24 letters.",
+               "The 100% held-out score after adding your hand was explicitly flagged as optimistic (held-out samples came from the same session). Training is a one-time step: "
+               "other users receive the saved model file and only run live.")
+    s += phase("Phase 3: the new project - gesture-control, first version",
+               "'Leave this as a separate project; now create a new project that can control my screen.' Then: 'make closed fist move the tab, wherever I touch it should let me move the tab in front'.",
+               "The original gesture-mouse project mixed concerns; screen control needed a clean state machine that can be tested without a camera.",
+               "Created gesture-control: poses, controller, One-Euro filter, mouse and window backends, calibration and training tools, rule-based recogniser (works with no training), "
+               "first config.yaml. First poses: index = cursor, pinch = click, thumb+middle pinch = right click, peace sign = scroll, fist = move the front window.",
+               "9 then 13 tests. Windows window lookup checked read-only against your real screen. Not tried on your hand.")
+    s += phase("Phase 4: controls reshaped three times",
+               "'It is not moving the cursor' - 'WHAT ARE THE CONTROLS' - 'IT IS NOT WORKING PROPERLY' - 'pointing and right click are the same' - 'make the open palm the cursor, keep the earlier options' - "
+               "'right click with two fingers, scroll was not working, and the fist should move the window under my cursor, not the front window'.",
+               "(1) A real bug: the smoothing parameter beta had been set to 0.02 instead of the tuned 8.0 (carried over wrongly), so the cursor lagged until it looked frozen. "
+               "(2) Thumb+middle pinch looked like pointing because a curled middle finger rests near the thumb. (3) 'Scroll by moving your hand' was not understood: it is movement, not a held position.",
+               "beta fixed. Right click became a three-finger pose, then two-finger when you asked, and scrolling moved to follow-up requests. Open palm became the cursor pose; index finger became a neutral 'pause' pose. "
+               "Fist now uses the window under the cursor (WindowFromPoint, top-level ancestor) instead of the foreground window. Unsure poses count as open palm so that a stray frame cannot grab a window.",
+               "14 then 15 tests; cursor at (587, 690) correctly resolved to the terminal window, nothing moved.")
+    s += phase("Phase 5: smoothing, the air gate and speed",
+               "'Make the movements smooth, my hand might not be stable' - 'only access fingers when it is in the air, not when my head is resting' - 'increase response and speed to capture'.",
+               "Shaky hands needed a stronger filter and a dead zone; resting hands needed to be ignored; and old camera frames pile up in a normal capture loop.",
+               "Smoothing: min_cutoff 1.0 to 0.5, beta 8 to 4, 5-pixel dead zone, filtered scroll motion. Air gate: hand must be fully visible and in the upper part of the picture, plus asleep until a one-second open palm. "
+               "ThreadedCamera keeps only the newest frame; the overlay shows real delay; harmless poses respond sooner.",
+               "16 to 25 tests. Measured: your camera delivers 30 fps; hand finding takes ~8 ms; forcing 60 fps made it worse (20 fps). A 23 fps reading was a one-off.")
+    s += phase("Phase 6: a drag that stopped, lag, and 'individual cursors'",
+               "'I pinched and moved the tab, it moved fine, then it suddenly stopped in the middle even though I pinched' - 'it is lagging' - 'can I add individual cursors? If I cannot, do not do it, but check'.",
+               "Four causes of the cut-off were fixed together: the air gate dropped the hand when it neared the bottom/edges; after one second the program fell asleep and a pinch cannot wake it; "
+               "single misread frames ended the drag; very short tracking dropouts released it. My smoothing for 'smooth' was too heavy at 59 ms. "
+               "Windows has exactly one system cursor, so real independent cursors are not possible on Windows 11 (they exist on Linux X11).",
+               "Relaxed in-air check while holding; debounced release (6 frames); 0.3 s dropout grace; wake never needed during a hold; three feel presets; messages tell you why a drag ended. "
+               "The experimental multi-cursor files were removed completely.",
+               "29 then 33 tests. A config.yaml parse failure caught before shipping (a PowerShell BOM): the loader now reads utf-8-sig and tests cover it. Sweep simulations compared lag and jitter per preset.")
+    s += phase("Phase 7: swapping scroll and right click",
+               "'Flip right click and scrolling: two fingers open and others closed for scrolling left, right, top, bottom; three fingers for right click.'",
+               "Scrolling had only been vertical.",
+               "Two fingers = scroll in four directions with horizontal scroll support, axis lock (2.0) and gain 150; three fingers = right click.",
+               "35 tests.")
+    s += phase("Phase 8: two cameras (built, then removed)",
+               "'Can I connect two cameras and use both?' -> 'I want stereo 3D, it should scan cameras, use as many as are connected' -> 'I have no printer' -> 'it can work automatically' -> "
+               "'why only one camera in the end?' -> 'it stopped moving properly; remove it for now, I want to fix existing issues'.",
+               "Stereo needs the cameras' relative positions. A checkerboard shown on a phone worked in a simulated test; automatic calibration from the hand also worked in simulation. "
+               "On your two real cameras the set-up gave up after 15 s because the hand has to be visible to both cameras at the same moment, and the app silently fell back to one camera. The log showed the "
+               "automatic set-up had worked once, but running both views together then stopped moving properly.",
+               "Removed from the app at your request. The code, tests and data were moved (not deleted) to archive/multicam, which the app never touches. The README no longer mentions it.",
+               "56 to 66 tests while it existed; back to 35 after removal; code search found no remaining references.")
+    s += phase("Phase 9: 'just like a mouse', fast and accurate",
+               "'I want the app to respond fast with my hand movement just like a mouse' - 'does USB-C reduce delay?' - 'how can I make it faster?' - 'it lags even when I move slowly' - 'it shows 15 to 31 ms'.",
+               "A webcam cannot match a mouse: 33 ms between pictures plus a 50-100 ms internal delay that no software can remove. USB-C itself does not help (the version behind it can). "
+               "My first relative mode over-damped slow movement (200 ms start, 34% follow). The 15-31 ms spread was the preview drawing stalling the loop one frame in ten.",
+               "Relative mode with acceleration; responsive feel; optional 720p; better slow-speed gain; preview moved to its own thread.",
+               "44 tests. Simulated: 133 ms and 91% follow after the fix. Preview-stall measured: 15-24 ms on 1 frame in 10 before, none after. Real-hand feel still needs your judgement.")
+    s += phase("Phase 10: extended screens",
+               "'What happens if I have an extended screen?' -> 'make it access it' -> 'I should be able to control on that screen as well'.",
+               "The app read only the main screen size, so the cursor and windows could never reach another screen, and a screen to the left or above has negative coordinates.",
+               "The whole virtual desktop is one area; per-monitor DPI awareness; config span/monitor options; window moves allowed into negative coordinates.",
+               "57 tests including simulated two- and three-screen layouts (right, left, above, below, unequal sizes, L-shapes). Later your log showed a 6400 x 2160 combined desktop.")
+    s += phase("Phase 11: precision, face lock, the yellow box and the blue line",
+               "'The cursor lost track: I made a fist to move a tab, it released in the middle' - 'make precision better, I want it to work perfectly' - 'it should match only the admin face' - "
+               "'why does it work only inside the yellow box?' - 'if the ball goes under the blue line, it does not work even when my hand is visible'.",
+               "The log proved the program had not lost the hand: it read the fist as palm 6 times and as click twice. Perfect precision is impossible: landmark error is about a pixel or two. "
+               "The yellow box limits nothing in relative mode; the real limits were the air gate's whole-hand-inside-the-picture rule and the blue line at 72%.",
+               "Fist judged by fingertip reach with stickiness (stays a fist until a finger clearly opens); longer window-release; cursor follows the average of four knuckles; click snap-back; "
+               "precision tool. Face lock built with OpenCV YuNet+SFace. edge_margin 0.02 to -0.15; blue line from 72% to 95% and now using the same point as the green circle.",
+               "61 to 78 tests. Face lock: models downloaded only after you answered the y/N prompt; first attempt via github.com failed (SSL WRONG_VERSION_NUMBER; GitHub is unreachable from Python on your "
+               "network), fixed by using Hugging Face; confirmed by you: 'it works great'.")
+    s += phase("Phase 12: rotated hand = right click; scrolling fingers curl = fist",
+               "'When I rotate my hand, why is it taking it as right click?' -> 'when I am scrolling top to bottom with two fingers, suddenly my fingers curled and it started to act as fist'.",
+               "Rotation shrinks apparent finger length, so reach-based 'extended' failed first for the pinky. Separately, a fist was accepted for any merely bent fingers, so two scrolling fingers "
+               "that relaxed became a fist and grabbed a window; and a pose seen on the very first frame could act immediately.",
+               "Straightness-based finger test (section 10.3) with hysteresis; stricter fist (reach < 1.10 and straightness < 0.60 to enter); sticky scroll; grab needs 5 frames; "
+               "click-type poses always wait the full hold, even as the first pose seen.",
+               "80 then 83 tests. Sweeps over yaw -65..65 and pitch -60..60 show no open palm read as right click. Facing the camera, the stricter fist moved from about 60% to about 70% required curl. "
+               "Remaining weak spots are in section 14.")
+    s += phase("Phase 13: window commands (discussed) and this document",
+               "'What are the best controls to close, minimise, enlarge, shrink and split the screen without overlapping?' -> 'fist already moves windows, won't it be misunderstood, and the controls seem small'.",
+               "A left-hand fist for 'close' would depend on MediaPipe always labelling hands correctly (it sometimes swaps them) and would collide with the grab fist. "
+               "So no pose may be reused, and anything destructive needs a pose nothing else uses.",
+               "Not built yet. Proposed in section 17. Instead, this guide and a single-file installer were produced.",
+               "Design discussion; the installer was built and self-tested (section 16).")
+    s += phase("Phase 14: a name and a brand - Hexra",
+               "You wanted a unique name that starts with H, then said it should reflect two hands and fingers, then control rather than projection, and finally that you want a short brand name. Final choice: <b>Hexra</b>, tagline <b>Your hands, in control</b>.",
+               "Names were checked on PyPI, npm and crates.io, GitHub (repo names, accounts, descriptions) and the web, including trademark aggregator sites. Rejected for real conflicts: HoloTouch (a holographic-touch company with trademarks), HaloTouch (a CHI 2025 research system and several Halo Touch products), HeliosTouch (a Helios Touch LLC trademark), Helm (the Kubernetes tool), Harmony (Logitech and Huawei marks), Hico and Haco (research benchmarks, software companies, taken packages). Hexra had no registry, GitHub or web match; the nearest is a puzzle game called Hexara. It is a coined word with no meaning of its own, which is why it is ownable; the tagline carries the meaning.",
+               "The program, installer, shortcuts, window title, Python package (hexra), settings comments, tests, this guide and the GitHub repository were renamed. The folder on disk is still called gesture-control.",
+               "All 83 tests pass after the rename; the installer was rebuilt and self-tested. Not done: a USPTO trademark search, a registrar check for domains and social handles. Do both before treating Hexra as a registered brand.")
+
+    s += [PageBreak(), P("13. The other projects on your PC", H1)]
+    s += table([["Folder", "What it is", "Status"],
+                ["hexra (this folder was called gesture-control)", "this program", "active"],
+                ["gesture-mouse", "the original single-hand mouse project that gesture-control grew from", "kept as it was; set up in phase 0"],
+                ["asl-fingerspell", "ASL alphabet recogniser (collect, calibrate, train, live, import_images)", "separate; trained with the Kaggle data plus your hand"],
+                ["asl-dataset", "the extracted subset of the Kaggle ASL Alphabet images", "can be deleted once the model is trained"],
+                ["archive (1).zip", "the 1.1 GB Kaggle download", "can be deleted; the landmarks are already extracted"],
+                ["gesture-control\\archive\\multicam", "the removed stereo code, tests and data", "not used by the app"]], [48, 82, 35])
+
+    s += [P("14. Known limits - read this before trusting it", H1)]
+    s += B(["<b>Webcam delay.</b> 30 fps and 50-100 ms of internal camera delay are hardware limits. The software part is 15-31 ms or less. It cannot feel exactly like a mouse.",
+            "<b>Precision.</b> Hand landmarks carry about a pixel or two of error; filtering reduces shake but cannot make it perfect.",
+            "<b>Tested in simulation.</b> The rotation, curl, jitter, lag and click-drift fixes were validated with simulated hands. Only the face lock, the basic operation and several fixes were reported working by you.",
+            "<b>Turned fists.</b> A fist turned sideways to the camera was not recognised in the simulation. A scroll hand tilted backwards was not detected in the simulation.",
+            "<b>Face lock is a convenience lock.</b> A photo or video of you can fool it; it checks a face, not whose hand it is.",
+            "<b>One hand at a time</b> is used for control (the first one found). Two-hand commands are not built.",
+            "<b>One camera</b> (camera 0). The multi-camera work is archived.",
+            "<b>Windows only.</b> The window mover and the DPI and monitor code use Windows APIs.",
+            "<b>The window mover</b> cannot move windows of programs running as administrator, because Windows blocks it.",
+            "<b>Unsigned installer.</b> Windows SmartScreen and some antivirus programs will warn."])
+
+    s += [P("15. Tests", H1)]
+    s += [P("83 automated tests, run with <font face='Courier'>.venv\\Scripts\\python -m pytest</font>. They need no camera: the controller, the recogniser and the "
+            "filters take plain numbers.")]
+    s += table([["File", "Tests", "What it checks"],
+                ["test_control.py", "32", "debounce; moving poses start within 2 frames and clicks need the full hold; drag survives flicker and short dropout, ends after sustained release or long loss; "
+                 "right click once per entry; scroll in all four directions and diagonal; shaky hand stays put; fist grab, window follows the hand, drop on open palm or lost hand; "
+                 "ambiguous hand never grabs; sticky fist; pinch hysteresis; open palm never right click at any tested yaw/pitch; scroll curl does not become a fist; grab needs 5 frames"],
+                ["test_relative.py", "9", "cursor starts from the real position without a jump; fast movement goes farther than slow; pointing lifts the mouse without a jump; a click lands where the cursor is; "
+                 "a tracking glitch does not fling the cursor; stays on screen; tremor barely moves it; dragging a window moves it by the cursor change; absolute mode unchanged"],
+                ["test_precision.py", "6", "the four-knuckle average ignores a one-landmark wobble and a pinch-time knuckle shift; a click lands where you aimed, not where the pinch pushed the hand; "
+                 "no snap-back while really moving; right click also lands on target; absolute mode unaffected"],
+                ["test_screens.py", "13", "single screen unchanged; second screen right, left (negative coordinates), above; three screens; primary-only and single-screen choice; bad screen number and manual override; "
+                 "this PC's real screens; absolute and relative cursor reach both edges; the dead area between unequal screens does not trap the cursor; default config describes the whole desktop"],
+                ["test_face_lock.py", "9", "admin accepted and stranger rejected; nobody in view is locked; grace period then lock; a stranger alone never unlocks; admin with a stranger beside is allowed; "
+                 "lenient mode; similar-but-different people; rate-limited threaded checks never block; enrolment file holds only numbers"],
+                ["test_gate.py", "10", "starts asleep; wakes after an open palm in the air; a resting low hand never wakes; a hand cut off by the frame edge is not in the air; a brief wobble resets the wake timer; "
+                 "lowering the hand sleeps; disabled gate passes everything; reaching low or to the edge while dragging does not drop; negative edge margin; the line uses the same point as the ball"],
+                ["test_config.py", "4", "shipped config loads; a file with a byte-order mark loads; explicit values override the preset; unknown feel is rejected"]], [32, 12, 121])
+
+    s += [PageBreak(), P("16. Building the installer and this guide", H1)]
+    s += [P("Everything is in the <font face='Courier'>packaging</font> folder of the project. The method was chosen so that nothing extra has to be downloaded or installed "
+            "on the target PC and no third-party installer toolkit is needed: the installer is itself a small Python program (tkinter wizard) packaged by PyInstaller.")]
+    s += table([["File", "Role"],
+                ["launcher.py", "entry point of Hexra.exe: sets the working folder to the install folder, runs the app with the rule recogniser, or enroll / precision / selftest / uninstall. "
+                 "Gives mediapipe empty stand-ins for matplotlib (which the program never uses) so that matplotlib can be left out."],
+                ["build_app.ps1", "PyInstaller command (run from the slim environment packaging/buildenv: mediapipe + plain opencv-python without the contrib extras, which only the face recogniser needed; the 30 MB video-file decoder is deleted because a webcam does not use it): console program, mediapipe collected in full, scikit-learn, scipy, pandas, pytest, matplotlib and PIL excluded"],
+                ["installer.py", "the wizard: folder choice, shortcuts, progress bar; silent mode /S /DIR= /NOSHORTCUTS; writes the uninstall entry in HKCU; keeps an existing config.yaml"],
+                ["make_icon.py", "draws app.ico"],
+                ["pdf_lib.py, content_*.py, make_pdf.py", "this document"],
+                ["build_all.ps1", "runs: build app, stage models and config, make the PDF, zip the payload, build the single-file installer"]], [48, 117])
+    s += [P("Rebuild", H3), code("cd <the project folder>\npowershell -ExecutionPolicy Bypass -File packaging\\build_all.ps1"),
+          P("Result: <font face='Courier'>packaging\\Hexra-Setup.exe</font> and <font face='Courier'>packaging\\Hexra-Guide.pdf</font>.")]
+    s += [P("What was deliberately left out of the installer", H3)]
+    s += B(["<b>Your enrolled face</b> (data\\admin_face.npz). Fingerprints of your face are personal; every installation enrols its own administrator.",
+            "Your logs, your edited config (a clean default config.yaml is shipped), the training tools' dependencies (scikit-learn, joblib), the archived multi-camera work and the tests."])
+    s += [P("Verification done on the packaged program", H3)]
+    s += B(["The packaged Hexra.exe was run with <font face='Courier'>selftest</font>: config loads, the hand tracker loads and runs on an empty picture, both face models load, "
+            "the recogniser and controller import.",
+            "The installer was run silently into a temporary folder and the result was checked (files, shortcuts, uninstall entry) and then removed.",
+            "The installed program was started with <font face='Courier'>--dry-run --no-face-lock</font> for 12 seconds: the camera opened and the loop ran without errors. "
+            "Uninstall was run and removed the folder, shortcuts and registry entry.",
+            "<b>Not verified:</b> tracking a real hand and the face enrolment from the packaged exe (no hand was in view during the 12-second run), and the visual wizard window on a clean second PC "
+            "(only the silent install path was exercised)."])
+
+    s += [P("17. Where it could go next", H1)]
+    s += [P("Window commands were discussed but not built. The recommended principle: <b>no pose is shared between two commands</b>, and destructive commands need a pose nothing else uses.", BODY)]
+    s += table([["Command", "Proposed gesture", "Notes"],
+                ["Split screen left / right", "grab with the fist and drag to the left or right edge (Windows-style snap)", "reuses the fist, no new pose"],
+                ["Maximise / restore", "drag a grabbed window to the top edge; or thumbs-up toggles", "thumb detection not built yet"],
+                ["Minimise", "thumbs-down", "new pose"],
+                ["Close", "an 'L' shape (thumb and index out) held 1.5 s with a progress ring", "hardest to undo; dropping the hand cancels"],
+                ["Enlarge / shrink", "two hands pinching apart / together (stage 3)", "needs two-hand tracking and reliable hand labels"]], [40, 80, 45])
+    s += [P("Suggested order: stage 1 edge-snap plus thumbs-up and down; stage 2 close with a ring; stage 3 two-hand resizing. A thumbs-up should not count while a fist is already held, "
+            "because some people stick the thumb out when making a fist. You said the controls 'seem small'; if that meant too few controls, more can be added, but each extra pose raises the chance of confusion; "
+            "if it meant on-screen size, the overlay text and the camera window can be enlarged.")]
+
+    s += [P("Glossary", H2)]
+    s += table([["Term", "Meaning"],
+                ["Landmark", "one of 21 numbered points MediaPipe finds on a hand"],
+                ["Pose", "a hand shape the program names: palm, point, click, right, scroll, fist"],
+                ["Debounce", "requiring a pose to persist for several frames before acting on it"],
+                ["Hysteresis", "different thresholds to enter and to leave a state so it cannot flicker at the boundary"],
+                ["One-Euro filter", "adaptive smoothing: strong when still, weak when moving fast"],
+                ["Relative mode", "cursor moves by hand movement with acceleration, like a mouse"],
+                ["Air gate", "the rule that the hand must be raised in the air and the program awake"],
+                ["Face lock", "gestures work only while the enrolled administrator's face is recognised"],
+                ["Embedding / fingerprint", "128 numbers describing a face; not an image"],
+                ["DPI awareness", "telling Windows the program uses true pixels so coordinates are not scaled"],
+                ["Dry run", "mode that tracks and shows poses without touching the mouse or windows"],
+                ["PyInstaller", "tool that packs Python programs and their libraries into an .exe"]], [38, 127])
+    return s

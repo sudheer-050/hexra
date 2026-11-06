@@ -1,0 +1,88 @@
+# Optional. Anything you leave out uses the defaults.
+# Screens: by default your hand controls ALL connected screens as one big desktop (the cursor, clicks, scrolling and
+# window grabbing all reach every screen, whichever side/above/below it is on).
+# screen:
+#   span: all          # all = every screen together (default) | primary = the main screen only
+#   monitor: 2         # or pick ONE screen: 1 = main screen, then the others from left to right
+#   # only if auto-detection fails:  width: 1920   height: 1080   left: 0   top: 0
+
+# Active box in the camera frame (x0, y0, x1, y1, fractions 0..1). Smaller = less reaching.
+region: [0.2, 0.15, 0.8, 0.7]
+
+# How the cursor feels. One word:
+#   smooth      steadiest hand-tremor rejection, most lag   (about 59 ms of filter lag at slow speeds)
+#   balanced    good steadiness, moderate lag               (about 28 ms)
+#   responsive  least lag, a little more shake at rest      (about 17 ms)   <- default
+feel: responsive
+
+# How the cursor follows your hand.
+#   relative  like a MOUSE: the cursor moves by how far your hand moves, with acceleration. Slow hand = fine control,
+#             fast flick = crosses the screen. Pointing with one finger "lifts the mouse": move your hand back, then
+#             open your palm and carry on from where the cursor was.
+#   absolute  the cursor copies your hand's position in the active box (region).
+cursor_mode: relative
+# Relative-mode feel (camera-widths of hand movement per second):
+#   rel_gain_min: 1.1   cursor speed vs hand for SLOW moves (lower = finer but feels laggier; below 1 it feels sluggish)
+#   rel_gain_max: 3.0   ...for fast flicks (higher = reach farther with a small flick)
+#   rel_v_low: 0.04  rel_v_high: 0.8   the speeds where the acceleration starts and ends
+#   rel_softness: 0.0003   hand movements smaller than this per frame are treated as tremor (higher = steadier but laggier)
+
+# Precision.
+#   cursor_point: knuckles   the cursor follows the AVERAGE of your four knuckles: steadier than one landmark, and it
+#                            does not shift when you pinch (index_knuckle = the old single point)
+#   click_lookback_s: 0.15   (relative mode) a click lands where the cursor was this many seconds BEFORE the pinch began,
+#                            so the pinch itself does not push the click off target. 0 = off
+#   click_snap_px: 100       ...but not when you were really moving (cursor travelled more than this)
+cursor_point: knuckles
+click_lookback_s: 0.15
+click_snap_px: 100
+
+# Camera picture size. 1280x720 gives the tracker more detail (about 1.5 ms slower per frame); try it.
+camera:
+  width: 640
+  height: 480
+
+# Advanced: set any of these to override the preset.  min_cutoff: 1.0   beta: 25.0   deadzone_px: 4
+
+hold_frames: 3      # frames a click/right-click/scroll must persist (cursor move needs only 2)
+grab_frames: 5      # frames a FIST must persist to grab a window (about 0.17 s): slower on purpose, so a tired hand does not grab
+scroll_gain: 150    # scroll speed (both directions)
+scroll_axis_lock: 2.0  # mostly up/down or mostly sideways motion scrolls one axis only (1.0 = always diagonal)
+
+release_frames: 6   # a click-drag ends only after the pose has really changed for this many frames
+grab_release_frames: 10  # a grabbed WINDOW needs this many (about 0.33 s) so it is not dropped by a wobble
+dropout_grace_s: 0.3  # keep holding through brief tracking losses (motion blur) up to this long
+
+# pose -> action.  Actions: move | drag | right_click | scroll | move_window | none
+actions:
+  palm: move          # open hand moves the cursor
+  fist: move_window   # grab the window under the cursor and move it
+  point: none         # index finger up = pause the cursor
+  click: drag
+  right: right_click
+  scroll: scroll
+
+# Air gate: gestures only work while your hand is raised in the air (not resting on a desk, lap or head).
+# It starts asleep: hold an open palm in the air for wake_seconds to wake it.
+air:
+  enabled: true
+  wake_seconds: 1.0       # how long to hold an open palm to wake
+  sleep_seconds: 1.0      # goes back to sleep after the hand is out of the air zone this long
+  max_center_y: 0.95      # the ball (your hand's centre) must be above the blue line (0 = top, 1 = bottom of the picture)
+  edge_margin: -0.15      # negative = a hand partly OUT of the picture still counts (up to 15% outside). 0.02 = whole hand must be inside
+
+# Look-ahead: moves the cursor slightly ahead of your hand to cancel part of the webcam's own delay.
+# Off by default: it overshoots when you stop (40 ms = about 120 px). Try 10-20 only if you want to experiment.
+lead_ms: 0
+
+# Face lock: the gestures only work while the ADMIN's face is recognised in the camera picture.
+# The first time, it asks to enrol you (and to download two small face models). Only numbers are stored, no photos.
+# Not strong security: a photo or video of you could fool it. Delete the saved face with:
+#   python -m hexra.enroll_face --clear
+face_lock:
+  enabled: true
+  admin_file: data/admin_face.npz
+  threshold: 0.363       # similarity needed to count as the admin (higher = stricter; 0.45 is stricter)
+  grace_s: 3.0           # you still count as present this long after the camera last recognised you
+  check_every_s: 0.4     # how often a picture is checked (on a background thread: no cursor delay)
+  require_face: true     # true: locked unless your face is seen. false: only an UNKNOWN face locks it
