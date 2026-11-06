@@ -21,8 +21,9 @@ def part3():
                 ["6", "Drag cut-offs, lag measurement, multiple cursors question", "29 to 33"], ["7", "Scroll and right-click swap", "35"],
                 ["8", "Two cameras, then removed", "56 to 66, back to 35"], ["9", "Mouse-like movement and latency", "44"],
                 ["10", "Extra screens", "57"], ["11", "Precision, face lock, edge and line fixes", "61 to 78"], ["12", "Rotation and scroll-to-fist bugs", "80 to 83"],
-                ["13", "Window commands (discussed, not built); this guide and the installer", "83"],
-                ["14", "Choosing a name; the product becomes Hexra", "83"]], [18, 120, 27])
+                ["13", "Window commands discussed; this guide and the installer", "83"],
+                ["14", "Choosing a name; the product becomes Hexra", "83"],
+                ["15", "Window commands built: thumbs-up/down, L close, edge snap", "109"]], [18, 120, 27])
 
     s += phase("Phase 0: the starting point - gesture-mouse",
                "You shared a conversation and asked to read the project folder and complete its setup. After it was closed: 'tell me what to run'. "
@@ -129,6 +130,14 @@ def part3():
                "Names were checked on PyPI, npm and crates.io, GitHub (repo names, accounts, descriptions) and the web, including trademark aggregator sites. Rejected for real conflicts: HoloTouch (a holographic-touch company with trademarks), HaloTouch (a CHI 2025 research system and several Halo Touch products), HeliosTouch (a Helios Touch LLC trademark), Helm (the Kubernetes tool), Harmony (Logitech and Huawei marks), Hico and Haco (research benchmarks, software companies, taken packages). Hexra had no registry, GitHub or web match; the nearest is a puzzle game called Hexara. It is a coined word with no meaning of its own, which is why it is ownable; the tagline carries the meaning.",
                "The program, installer, shortcuts, window title, Python package (hexra), settings comments, tests, this guide and the GitHub repository were renamed. The folder on disk is still called gesture-control.",
                "All 83 tests pass after the rename; the installer was rebuilt and self-tested. Not done: a USPTO trademark search, a registrar check for domains and social handles. Do both before treating Hexra as a registered brand.")
+    s += phase("Phase 15: window commands",
+               "'Build the window commands next.' (the design from phase 13: no pose shared between a command and a movement; close must be hard to trigger by accident).",
+               "Thumbs-up, thumbs-down and an L shape needed thumb detection, which did not exist. A first version read the simulated pointing hand as an L 95% of the time, because geometry alone cannot separate a thumb held out from an intentional L; "
+               "the L angle window was raised to 75 to 125 degrees. A held thumbs-up fired again after its cooldown, and the cursor moved for the first frame of a command pose; both were caught by tests and fixed.",
+               "Three new poses in the rule recogniser; timed one-shot commands in the controller (0.5 s, close 1.5 s with a progress ring; cancel on dropping the pose; fire once; no cursor movement; no fist grab for 0.8 s after a command); "
+               "edge snapping of a fist-dragged window with a live hint; Win32 maximise, minimise, close (WM_CLOSE) and monitor-aware half-screen snapping; config keys and documentation.",
+               "109 tests (26 new). Simulation: frontal hand read as a command by mistake 0% of the time; commands caught 99 to 100% frontal, about 79 to 96% turned 20 degrees. "
+               "Not done: a test on your real hand, and a live test of the Win32 calls on real windows (only the lookups were smoke-tested).")
 
     s += [PageBreak(), P("13. The other projects on your PC", H1)]
     s += table([["Folder", "What it is", "Status"],
@@ -146,13 +155,14 @@ def part3():
             "<b>Turned fists.</b> A fist turned sideways to the camera was not recognised in the simulation. A scroll hand tilted backwards was not detected in the simulation.",
             "<b>Face lock is a convenience lock.</b> A photo or video of you can fool it; it checks a face, not whose hand it is.",
             "<b>One hand at a time</b> is used for control (the first one found). Two-hand commands are not built.",
+            "<b>Window commands are new and untested on a real hand.</b> A thumb held out while pointing can look like an L, so close needs a 1.5 s hold and shows a ring. They need the rule recogniser (the default); a personally trained classifier does not produce the thumb poses.",
             "<b>One camera</b> (camera 0). The multi-camera work is archived.",
             "<b>Windows only.</b> The window mover and the DPI and monitor code use Windows APIs.",
             "<b>The window mover</b> cannot move windows of programs running as administrator, because Windows blocks it.",
             "<b>Unsigned installer.</b> Windows SmartScreen and some antivirus programs will warn."])
 
     s += [P("15. Tests", H1)]
-    s += [P("83 automated tests, run with <font face='Courier'>.venv\\Scripts\\python -m pytest</font>. They need no camera: the controller, the recogniser and the "
+    s += [P("109 automated tests, run with <font face='Courier'>.venv\\Scripts\\python -m pytest</font>. They need no camera: the controller, the recogniser and the "
             "filters take plain numbers.")]
     s += table([["File", "Tests", "What it checks"],
                 ["test_control.py", "32", "debounce; moving poses start within 2 frames and clicks need the full hold; drag survives flicker and short dropout, ends after sustained release or long loss; "
@@ -168,6 +178,9 @@ def part3():
                  "lenient mode; similar-but-different people; rate-limited threaded checks never block; enrolment file holds only numbers"],
                 ["test_gate.py", "10", "starts asleep; wakes after an open palm in the air; a resting low hand never wakes; a hand cut off by the frame edge is not in the air; a brief wobble resets the wake timer; "
                  "lowering the hand sleeps; disabled gate passes everything; reaching low or to the edge while dragging does not drop; negative edge margin; the line uses the same point as the ball"],
+                ["test_commands.py", "26", "thumbs-up, thumbs-down and L are recognised; an ordinary fist (thumb tucked, to the side or diagonal) never is; pointing is not an L; a thumb out of a held fist is ignored; "
+                 "tilt tolerance and no flicker; a command fires once after its hold, again only after leaving the pose; close needs 1.5 s and shows progress; dropping the pose cancels; a flicker keeps progress; "
+                 "the cursor does not move during a command; no command while a fist is held; no grab right after a command; remapping works; edge zones, left/right/top snap, corners, live hint, no snap when the hand is lost or snapping is off, snap uses the screen under the cursor"],
                 ["test_config.py", "4", "shipped config loads; a file with a byte-order mark loads; explicit values override the preset; unknown feel is rejected"]], [32, 12, 121])
 
     s += [PageBreak(), P("16. Building the installer and this guide", H1)]
@@ -196,15 +209,16 @@ def part3():
             "(only the silent install path was exercised)."])
 
     s += [P("17. Where it could go next", H1)]
-    s += [P("Window commands were discussed but not built. The recommended principle: <b>no pose is shared between two commands</b>, and destructive commands need a pose nothing else uses.", BODY)]
-    s += table([["Command", "Proposed gesture", "Notes"],
-                ["Split screen left / right", "grab with the fist and drag to the left or right edge (Windows-style snap)", "reuses the fist, no new pose"],
-                ["Maximise / restore", "drag a grabbed window to the top edge; or thumbs-up toggles", "thumb detection not built yet"],
-                ["Minimise", "thumbs-down", "new pose"],
-                ["Close", "an 'L' shape (thumb and index out) held 1.5 s with a progress ring", "hardest to undo; dropping the hand cancels"],
-                ["Enlarge / shrink", "two hands pinching apart / together (stage 3)", "needs two-hand tracking and reliable hand labels"]], [40, 80, 45])
-    s += [P("Suggested order: stage 1 edge-snap plus thumbs-up and down; stage 2 close with a ring; stage 3 two-hand resizing. A thumbs-up should not count while a fist is already held, "
-            "because some people stick the thumb out when making a fist. You said the controls 'seem small'; if that meant too few controls, more can be added, but each extra pose raises the chance of confusion; "
+    s += [P("Window commands are now built (section 4, 10.8 and phase 15). The design principle stays: <b>no pose is shared between two commands</b>, and destructive commands need a pose nothing else uses.", BODY)]
+    s += table([["Idea", "Status", "Notes"],
+                ["Split screen left / right", "built", "drag with a fist to the left or right edge and open the hand"],
+                ["Maximise / restore", "built", "thumbs-up held 0.5 s, or drag to the top edge"],
+                ["Minimise", "built", "thumbs-down held 0.5 s"],
+                ["Close", "built", "L shape held 1.5 s with a ring; same as the X button"],
+                ["Quarter-screen snapping", "idea", "corners; today a corner counts as a side"],
+                ["Enlarge / shrink", "idea", "two hands pinching apart / together; needs two-hand tracking and reliable hand labels"],
+                ["Face lock in the installer", "idea", "it is in the source, off in the installer build"]], [50, 22, 93])
+    s += [P("You said the controls 'seem small'; if that meant too few controls, nine poses are now available, but each extra pose raises the chance of confusion; "
             "if it meant on-screen size, the overlay text and the camera window can be enlarged.")]
 
     s += [P("Glossary", H2)]

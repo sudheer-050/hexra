@@ -32,6 +32,9 @@ def part2():
                 ["Cannot reach the far screen", "span set to primary, or a monitor on another graphics adapter",
                  "screen: span: all; check 'Controlling N screens' at the top of last_run.log"],
                 ["Black window closes immediately", "an error", "run it from a terminal (Start > cmd > the install path) or read data\\last_run.log"],
+                ["A window is minimised, maximised or closed when I did not mean it", "a thumb held out looked like thumbs-up/down or an L (closest to pointing with the thumb out)",
+                 "keep the thumb tucked when pointing; raise command_hold_s / close_hold_s; or remap or disable a pose in config.yaml (set its action to none)"],
+                ["Dragging a window to the edge does not snap", "the cursor was not within snap_edge_px of the screen edge when you opened the fist", "drag until the hint 'release to snap' appears; raise snap_edge_px"],
                 ["Windows warns about the installer", "the file is not code-signed", "More info > Run anyway; see section 2"]], [47, 54, 64])
 
     s += [P("8. How the program is built", H1)]
@@ -63,7 +66,7 @@ def part2():
                 ["<b>tracker.py</b>", "<b>HandTracker</b>: MediaPipe Tasks API, hand landmarker in VIDEO mode (it tracks between frames instead of searching from scratch, which is faster). "
                  "<i>ensure_model</i> uses the bundled .task file; downloads only if it is missing (it never is in the installed version)."],
                 ["<b>features.py</b>", "<b>normalize</b>: 21 landmarks to a feature vector independent of position, size and which hand it is (wrist at origin, divided by palm length, mirrored for the left hand)."],
-                ["<b>poses.py</b>", "<b>RuleRecognizer</b> (hand-written geometry, no training) and <b>MLRecognizer</b> (a classifier you can train on your own recordings). Details in section 10."],
+                ["<b>poses.py</b>", "<b>RuleRecognizer</b> (hand-written geometry, no training) and <b>MLRecognizer</b> (a classifier you can train on your own recordings). Details in section 10. Thumbs-up, thumbs-down and the L shape (window commands) are recognised by this rule recogniser only."],
                 ["<b>controller.py</b>", "the state machine: pose to action. Debounce, hold and release counts, relative cursor, acceleration, click snap-back, scroll with axis lock, window grab, drag, dropout grace. "
                  "No camera or OS calls in this file, so every behaviour is unit-tested."],
                 ["<b>filters.py</b>", "<b>OneEuroFilter</b> and <b>PointFilter</b> (x and y): the adaptive smoothing described in section 10."],
@@ -84,7 +87,7 @@ def part2():
                 ["config.yaml", "settings (section 6)"],
                 ["run.bat", "development launcher: starts the app from the project's own Python environment and keeps the window open"],
                 ["pyproject.toml", "package definition and dependencies: mediapipe, opencv-python, numpy, scikit-learn, joblib, pynput, pyyaml; dev: pytest"],
-                ["tests\\", "83 automated tests in 7 files (section 15)"],
+                ["tests\\", "109 automated tests in 8 files (section 15)"],
                 ["models\\", "hand_landmarker.task and the two face .onnx models"],
                 ["data\\", "admin_face.npz (your fingerprints), last_run.log"],
                 ["archive\\multicam\\", "the removed multi-camera stereo code, tests and data (section 12, phase 8); not used by the app"],
@@ -152,6 +155,22 @@ def part2():
           P("The program declares itself per-monitor DPI aware so that Windows reports true pixels instead of scaled ones. It lists monitors with EnumDisplayMonitors and builds the virtual "
             "desktop rectangle (a monitor to the left or above the main one has negative coordinates). Relative cursor movement is clamped to that rectangle. A grabbed window moves via "
             "SetWindowPos (no resize, no z-order change, no activation); the window is the top-level ancestor of whatever is under the cursor, skipping the desktop and the taskbar.")]
+
+    s += [P("10.8 Window commands", H2),
+          P("Three more poses are added by the rule recogniser. The thumb counts as <i>out</i> when its four bones form a straight line (straightness 0.85 or more, like the fingers) and it reaches at least half a palm "
+            "length from its base joint; a thumb whose joints coincide (a tracking dropout) is ignored. <b>Thumbs-up / thumbs-down</b>: thumb out, index, middle and ring clearly folded (the same fist test) and pinky bent, "
+            "with the thumb within about 30 degrees of vertical (looser once held, 40 degrees, so it does not flicker); image y grows downwards, so a thumb tip above its base is up. "
+            "<b>L</b>: thumb out, index extended, the other three bent, and 75 to 125 degrees between the thumb and the index finger, so a thumb merely held out while pointing does not count. "
+            "None of the three can start while the last pose was a fist."),
+          P("In the controller a command pose does not go through the click debounce. It runs its own timer: the pose must be on screen for 0.5 s (maximise, minimise) or 1.5 s (close). "
+            "A flicker shorter than 0.15 s keeps the progress; any longer change cancels it. When the timer completes the command fires once on the window under the cursor and the pose must be left before it can fire again. "
+            "While a command pose is shown the rest of the state machine sees a neutral pose, so the cursor stops at once. For 0.8 s after a command a fist cannot grab a window, and commands never start while a fist or pinch is held."),
+          P("<b>Snapping.</b> While a window is held with a fist, the cursor's distance to the edge of the screen it is on (found with MonitorFromPoint, so it works on any screen) is checked every frame; inside the zone "
+            "(30 pixels) a hint is shown. Opening the fist there snaps the window: the left or right half of that screen's work area (the screen minus the taskbar, adjusted for Windows' invisible resize borders), "
+            "or maximise at the top edge. A corner counts as a side edge. Losing the hand never snaps. Close sends WM_CLOSE, the same message as the window's X button."),
+          P("Measured on the simulated articulated hand (the same model as section 10.3, 300 noisy samples per case): facing the camera, none of the six existing poses was ever read as a command, and the three real commands "
+            "were caught 99 to 100% of the time. Turned up to 20 degrees and rolled 15, thumbs-up and thumbs-down were caught 79% of the time (about a fifth of fists are already misread as open palm at that noise level, "
+            "which is a property of the simulation) and the L 96%; at 35 degrees of turn at most 2.3% of pointing frames looked like an L. These are simulation numbers, not measurements on your hand.", SMALL)]
 
     s += [PageBreak(), P("11. Privacy and safety", H1)]
     s += B(["<b>No picture ever leaves your computer.</b> The program never sends data anywhere. The only network code in it is a helper that downloads a model file if one is missing, and the installer includes all three models, so it does not run. Pictures live in memory for one frame.",

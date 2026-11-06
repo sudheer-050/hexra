@@ -16,6 +16,14 @@ POSE_HELP = {
     "right": "three fingers up: index + middle + ring, pinky down (right click)",
     "scroll": "two fingers up: index + middle, others closed; move your hand up/down/left/right to scroll",
 }
+# Window-command poses. They are recognised by RuleRecognizer only (not part of the trainable six) and each is a
+# one-shot command (see controller.py), so no pose is shared between a command and a movement.
+COMMAND_POSES = ["thumb_up", "thumb_down", "ell"]
+COMMAND_HELP = {
+    "thumb_up": "thumbs-up (fist with the thumb straight up): maximise / restore the window under the cursor",
+    "thumb_down": "thumbs-down (fist with the thumb straight down): minimise the window under the cursor",
+    "ell": "L shape (thumb out sideways, index finger up, the rest closed), held: close the window under the cursor",
+}
 WRIST, THUMB_TIP, INDEX_TIP, MIDDLE_TIP = 0, 4, 8, 12
 _FINGERS = {"index": (6, 8), "middle": (10, 12), "ring": (14, 16), "pinky": (18, 20)}  # (pip, tip)
 _CHAINS = {"index": (5, 6, 7, 8), "middle": (9, 10, 11, 12), "ring": (13, 14, 15, 16), "pinky": (17, 18, 19, 20)}  # knuckle..tip
@@ -54,6 +62,13 @@ class RuleRecognizer:
     STRAIGHT_STAY = 0.78  # ...but a finger that was extended a moment ago stays "extended" down to this (no flicker)
     BENT = 0.80           # straightness below this = curled finger
     SHORT_REACH = 1.10    # ...or a not-quite-straight finger that reaches less than this
+    # Thumb: "out" when its bones form a straight line AND it reaches well away from the palm. A thumb resting on a fist
+    # is short and bent, so an ordinary fist is never read as thumbs-up.
+    THUMB_STRAIGHT, THUMB_LENGTH = 0.85, 0.50
+    THUMB_VERTICAL = 0.60      # |sideways| <= this x |vertical| counts as pointing up/down (about 30 degrees)
+    THUMB_VERTICAL_STAY = 0.85  # ...a little looser once the pose is already held, so it does not flicker
+    ELL_ANGLE = (75.0, 125.0)  # the angle between thumb and index finger for an "L": clearly sideways, not just a thumb held out
+    THUMB_BONE_MIN = 0.04      # a thumb whose joints coincide has no usable direction (tracking dropout): ignored
 
     def __init__(self, pinch_ratio: float = 0.25, release_ratio: float = 0.40):
         self.pinch_ratio = pinch_ratio      # fingers must come this close to START a pinch
@@ -72,14 +87,17 @@ class RuleRecognizer:
         r_lim, s_lim = (self.FIST_REACH_STAY, self.FIST_STRAIGHT_STAY) if stay else (self.FIST_REACH_ENTER, self.FIST_STRAIGHT_ENTER)
         fist_like = all(reach[n] < r_lim and straight[n] < s_lim for n in ("index", "middle", "ring"))
         ext = {n: s >= (self.STRAIGHT_STAY if self._ext_prev.get(n) else self.STRAIGHT) for n, s in straight.items()}
-        if self._last == "fist" and fist_like:
+        cur = {n: s < self.BENT or (s < self.STRAIGHT and reach[n] < self.SHORT_REACH) for n, s in straight.items()}
+        pose = self._thumb_pose(pts, size, straight, reach, ext, cur)
+        if pose is not None:
+            pass                              # a window-command pose (thumbs up / down, L)
+        elif self._last == "fist" and fist_like:
             pose = "fist"                    # sticky: a thumb against the index finger does not turn a fist into a click
         elif self._pinched:
             pose = "click"
         elif fist_like:
             pose = "fist"
         else:
-            cur = {n: s < self.BENT or (s < self.STRAIGHT and reach[n] < self.SHORT_REACH) for n, s in straight.items()}
             if all(ext.values()):
                 pose = "palm"
             elif ext["index"] and cur["middle"] and cur["ring"] and cur["pinky"]:
@@ -93,6 +111,32 @@ class RuleRecognizer:
         self._last = pose
         self._ext_prev = ext if pose in ("palm", "point", "scroll", "right") else {}
         return pose
+
+    def _thumb_pose(self, pts, size, straight, reach, ext, cur):
+        """thumb_up / thumb_down / ell, or None. Never starts while a fist is held: a thumb sticking out of a fist that is
+        dragging a window must not become a command."""
+        if self._last == "fist":
+            return None
+        if min(_d(pts, a, b) for a, b in ((1, 2), (2, 3), (3, 4))) / size < self.THUMB_BONE_MIN:
+            return None
+        thumb_straight = _straightness(pts, (1, 2, 3, 4))
+        vec = pts[4, :2] - pts[2, :2]
+        if thumb_straight < self.THUMB_STRAIGHT or float(np.linalg.norm(vec)) / size < self.THUMB_LENGTH:
+            return None
+        held = self._last in ("thumb_up", "thumb_down")
+        r_lim, s_lim = (self.FIST_REACH_STAY, self.FIST_STRAIGHT_STAY) if held else (self.FIST_REACH_ENTER, self.FIST_STRAIGHT_ENTER)
+        four_curled = all(reach[n] < r_lim and straight[n] < s_lim for n in ("index", "middle", "ring")) and cur["pinky"]
+        tilt = self.THUMB_VERTICAL_STAY if held else self.THUMB_VERTICAL
+        if four_curled and abs(vec[0]) <= tilt * abs(vec[1]):
+            return "thumb_up" if vec[1] < 0 else "thumb_down"       # image y grows downwards
+        if ext["index"] and cur["middle"] and cur["ring"] and cur["pinky"]:
+            idx = pts[8, :2] - pts[5, :2]
+            denom = float(np.linalg.norm(vec) * np.linalg.norm(idx))
+            if denom > 1e-9:
+                angle = float(np.degrees(np.arccos(np.clip(np.dot(vec, idx) / denom, -1.0, 1.0))))
+                if self.ELL_ANGLE[0] <= angle <= self.ELL_ANGLE[1]:
+                    return "ell"
+        return None
 
     def predict_features(self, feats) -> str:
         return self.predict_points(np.asarray(feats, dtype=np.float32).reshape(21, 3))

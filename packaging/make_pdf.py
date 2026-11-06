@@ -1,4 +1,5 @@
 """Builds the Hexra guide PDF.   usage: python make_pdf.py <output.pdf>"""
+import os
 import sys
 from pathlib import Path
 
@@ -7,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import NextPageTemplate, PageBreak, Paragraph, Spacer
+from reportlab.platypus import Image, NextPageTemplate, PageBreak, Paragraph, Spacer
 
 from content_a import part1
 from content_b import part2
@@ -42,10 +43,12 @@ def cover():
     t = ParagraphStyle("ct", fontName="Helvetica-Bold", fontSize=38, leading=44, textColor=colors.white)
     st = ParagraphStyle("cs", fontName="Helvetica", fontSize=16, leading=22, textColor=colors.HexColor("#b7c6e6"))
     sm = ParagraphStyle("cm", fontName="Helvetica", fontSize=10.5, leading=15, textColor=colors.HexColor("#b7c6e6"))
-    return [Spacer(1, 60 * mm), Paragraph("Hexra", t), Spacer(1, 6 * mm),
+    logo = Image(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "logo.png"), width=38 * mm, height=38 * mm)
+    logo.hAlign = "LEFT"
+    return [Spacer(1, 40 * mm), logo, Spacer(1, 10 * mm), Paragraph("Hexra", t), Spacer(1, 6 * mm),
             Paragraph("Your hands, in control.", st), Spacer(1, 14 * mm),
             Paragraph("User guide, how it works inside, and the full story of how it was built: where it started, every change, and why.", sm),
-            Spacer(1, 60 * mm), Paragraph("Version 1.0 &nbsp;|&nbsp; Windows 10/11 &nbsp;|&nbsp; Python 3.10 &nbsp;|&nbsp; 83 automated tests", sm),
+            Spacer(1, 60 * mm), Paragraph("Version 1.1 &nbsp;|&nbsp; Windows 10/11 &nbsp;|&nbsp; Python 3.10 &nbsp;|&nbsp; 109 automated tests", sm),
             NextPageTemplate("main"), PageBreak()]
 
 

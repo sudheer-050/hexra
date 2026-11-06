@@ -119,6 +119,18 @@ def part1():
                 ["<b>Fist</b>", "all fingers clearly closed", "<b>Grab the window under the cursor</b> (not the window in front) and move it as your hand moves. "
                  "Open the hand to drop it. A maximised window is restored first so that it can move. The desktop and taskbar are never grabbed."]],
                [28, 52, 85])
+    s += [P("Window commands", H3),
+          P("Three more poses act on the <b>window under the cursor</b>. Each is a <i>held</i> pose: a ring fills in the camera window, nothing happens until it is full, "
+            "and dropping the pose cancels it.")]
+    s += table([["Hand shape", "Hold", "What it does"],
+                ["<b>Thumbs-up</b>: a fist with the thumb straight up", "0.5 s", "<b>Maximise</b>; again to restore"],
+                ["<b>Thumbs-down</b>: a fist with the thumb straight down", "0.5 s", "<b>Minimise</b>"],
+                ["<b>L shape</b>: thumb out sideways, index finger up, the rest closed", "1.5 s (red ring)", "<b>Close</b>: the same as clicking the window's X, so the program can still ask to save"],
+                ["<b>Fist dragged to a screen edge, then opened</b>", "release", "<b>Snap</b>: left or right edge = that half of the screen, top edge = maximise. A live hint appears in the zone"]],
+               [66, 28, 71])
+    s += callout("Why these cannot be confused with the movement poses",
+                 "No pose is shared. They never act on the desktop, the taskbar or Hexra's own windows; they cannot start while you hold a fist or a pinch (a thumb sticking out of a dragging fist is ignored); "
+                 "and a fist cannot grab a window for 0.8 s after a command, so a hand relaxing out of a thumbs-up grabs nothing. An L is close to pointing with the thumb out, so close needs the long hold and shows its ring.", AMBER)
     s += [P("Rules of thumb", H3)]
     s += B(["<b>Scroll is about movement</b>, not about holding your hand straight. Make the two-finger shape, then move the hand.",
             "<b>Aim first, then act.</b> Open palm to put the cursor on the target, then pinch (or make the fist).",
@@ -178,6 +190,9 @@ def part1():
                 ["grab_frames", "5", "frames a fist must persist to grab a window (~0.17 s)"],
                 ["release_frames", "6", "frames a different pose must persist to end a click-drag"],
                 ["grab_release_frames", "10", "frames (~0.33 s) to drop a grabbed window"],
+                ["command_hold_s / close_hold_s", "0.5 / 1.5", "seconds to hold thumbs-up or thumbs-down / the L shape before the command fires"],
+                ["command_cooldown_s", "0.8", "after a command, a fist cannot grab a window for this long"],
+                ["snap_edges / snap_edge_px", "true / 30", "snap a fist-dragged window released at a screen edge; how close to the edge counts, in pixels"],
                 ["dropout_grace_s", "0.3", "keep holding through brief tracking losses up to this long"],
                 ["scroll_gain", "150", "scroll speed (both axes)"],
                 ["scroll_axis_lock", "2.0", "mostly-vertical or mostly-horizontal movement scrolls one axis only (1.0 = always diagonal)"],
@@ -192,8 +207,8 @@ def part1():
                 ["face_lock.check_every_s", "0.4", "how often a picture is checked"],
                 ["face_lock.require_face", "true", "true: locked unless your face is seen. false: only an unknown face locks it"]], [47, 32, 86])
     s += [P("Changing what a pose does", H3),
-          code("actions:\n  palm: move          # move | drag | right_click | scroll | move_window | none\n  fist: move_window\n"
-               "  point: none\n  click: drag\n  right: right_click\n  scroll: scroll"),
+          code("actions:\n  palm: move          # move | drag | right_click | scroll | move_window | toggle_maximize | minimize | close_window | none\n  fist: move_window\n"
+               "  point: none\n  click: drag\n  right: right_click\n  scroll: scroll\n  thumb_up: toggle_maximize\n  thumb_down: minimize\n  ell: close_window"),
           P("Command-line options (add them to a shortcut's target or run from a terminal):", BODY)]
     s += table([["Command", "Effect"],
                 ["Hexra.exe", "start normally"],

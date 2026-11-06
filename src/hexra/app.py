@@ -57,7 +57,8 @@ def load_config(path: str) -> ControllerConfig:
     cfg.cursor_point = point
     for key in ("min_cutoff", "beta", "deadzone_px", "lead_ms", "hold_frames", "grab_frames", "release_frames", "grab_release_frames", "dropout_grace_s",
                 "scroll_gain", "scroll_axis_lock", "rel_gain_min", "rel_gain_max", "rel_v_low", "rel_v_high",
-                "rel_softness", "rel_max_jump", "click_lookback_s", "click_snap_px"):
+                "rel_softness", "rel_max_jump", "click_lookback_s", "click_snap_px",
+                "command_hold_s", "close_hold_s", "command_grace_s", "command_cooldown_s", "snap_edges", "snap_edge_px"):
         if key in data:
             setattr(cfg, key, type(getattr(cfg, key))(data[key]))
     cfg.actions.update(data.get("actions", {}))
@@ -178,6 +179,12 @@ def main() -> None:
                 draw_hand(frame, lm)
                 p = ctl.point(lm)
                 cv2.circle(frame, (int(p.x * w), int(p.y * h)), 10, (0, 0, 255) if stable == "click" else (0, 255, 0), 2)
+                if ctl.cmd_progress > 0:                          # a held window command: a ring fills until it fires
+                    centre = (int(p.x * w), int(p.y * h))
+                    colour = (0, 0, 255) if ctl.cmd_label == "close" else (0, 200, 255)
+                    cv2.ellipse(frame, centre, (34, 34), -90, 0, 360 * ctl.cmd_progress, colour, 5, cv2.LINE_AA)
+                    cv2.putText(frame, f"hold to {ctl.cmd_label}", (max(centre[0] - 70, 4), max(centre[1] - 48, 18)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, colour, 2, cv2.LINE_AA)
             if gate.enabled:
                 ly = int(gate.max_center_y * h)
                 cv2.line(frame, (0, ly), (w, ly), (255, 128, 0), 1)   # hand must be ABOVE this line
@@ -195,6 +202,8 @@ def main() -> None:
                             (0, 255, 0) if ok_now else (0, 0, 255), 1, cv2.LINE_AA)
                 if not ok_now:
                     cv2.putText(frame, "LOCKED", (10, h - 100), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3, cv2.LINE_AA)
+            if ctl.hint:
+                cv2.putText(frame, ctl.hint.upper(), (10, h - 130), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
             if shown_note and time.monotonic() < note_until:
                 cv2.putText(frame, shown_note, (10, h - 75), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 255), 2)
             status = "ENGAGED" if engaged.is_set() else "PAUSED (F8 or 'e')"

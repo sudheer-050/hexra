@@ -61,6 +61,23 @@ actions:
   click: drag
   right: right_click
   scroll: scroll
+  thumb_up: toggle_maximize   # thumbs-up: maximise the window under the cursor (again: restore it)
+  thumb_down: minimize        # thumbs-down: minimise the window under the cursor
+  ell: close_window           # L shape (thumb out, index up): close the window under the cursor, after a long hold
+
+# Window commands (the three poses above). Each is a HELD pose: nothing happens until the hold is complete, a ring
+# fills in the camera window while you hold, and dropping the pose cancels it. They act on the window under the cursor,
+# never on the desktop, the taskbar or Hexra's own windows. Close is the same as clicking the window's X: the program may
+# still ask to save. They only work while you are NOT holding a fist or a pinch, and a fist cannot grab a window for a
+# moment after a command, so a hand relaxing out of a thumbs-up cannot grab anything.
+command_hold_s: 0.5        # hold thumbs-up / thumbs-down this long
+close_hold_s: 1.5          # hold the L shape this long (longer on purpose: closing is the hardest to undo)
+command_cooldown_s: 0.8    # after a command, a fist cannot grab a window for this long
+
+# Snap: drag a window with a fist and let go while the cursor is at a screen edge. Left or right edge = that half of the
+# screen (split screen), top edge = maximise. A live hint appears while you are in the zone.
+snap_edges: true
+snap_edge_px: 30           # how close to the edge counts (in screen pixels)
 
 # Air gate: gestures only work while your hand is raised in the air (not resting on a desk, lap or head).
 # It starts asleep: hold an open palm in the air for wake_seconds to wake it.

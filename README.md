@@ -3,6 +3,10 @@
 <div align="center">
 
 <p align="center">
+  <img src="assets/logo.png" alt="Hexra logo: a blue wave" width="120" />
+</p>
+
+<p align="center">
   <img src="assets/banner.png" alt="Hexra - your hands, in control" width="100%" />
 </p>
 
@@ -24,7 +28,7 @@
 [![Release](https://img.shields.io/github/v/release/sudheer-050/hexra?color=blue&logo=github&logoColor=white)](https://github.com/sudheer-050/hexra/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078d4?logo=windows&logoColor=white)]()
-[![Tests](https://img.shields.io/badge/tests-83%20passed%20(100%25)-brightgreen.svg?logo=pytest&logoColor=white)]()
+[![Tests](https://img.shields.io/badge/tests-109%20passed%20(100%25)-brightgreen.svg?logo=pytest&logoColor=white)]()
 [![Tracking](https://img.shields.io/badge/hand%20tracking-MediaPipe-orange.svg)](https://developers.google.com/mediapipe)
 [![Privacy](https://img.shields.io/badge/privacy-100%25%20local%20%7C%20no%20cloud-success.svg)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
@@ -60,6 +64,19 @@ Want to look before you touch? Start **"Hexra (try it, mouse untouched)"** from 
 
 Every shape is different from every other, and anything the program is unsure about counts as *open palm*, which can only move the cursor. A shaky frame can never click or grab.
 
+### 🪟 Window commands (new)
+
+Three more poses act on the **window under the cursor**. Each is a *held* pose: a ring fills in the camera window, nothing happens until it is full, and dropping the pose cancels it. No pose is shared with a movement gesture.
+
+| Hand shape | Hold | What happens |
+| :--- | :--- | :--- |
+| 👍 **Thumbs-up** (fist, thumb straight up) | 0.5 s | **Maximise**, or restore if it is already maximised |
+| 👎 **Thumbs-down** (fist, thumb straight down) | 0.5 s | **Minimise** |
+| 🤙 **L shape** (thumb out sideways, index up, rest closed) | 1.5 s, red ring | **Close**: the same as clicking the window's X, so the program can still ask to save |
+| ✊ **Fist, dragged to a screen edge, then opened** | release | **Snap**: left or right edge = that half of the screen (split screen), top edge = maximise. A live hint shows while you are in the zone |
+
+Safety: they never act on the desktop, the taskbar or Hexra's own windows; they cannot start while you are holding a fist or a pinch; and a fist cannot grab a window for 0.8 s after a command, so a hand relaxing out of a thumbs-up grabs nothing. Switch snapping off with `snap_edges: false`; change holds in `config.yaml`.
+
 ---
 
 ## 🎯 Overview: What It Does vs. What It Doesn't Do
@@ -70,11 +87,12 @@ Every shape is different from every other, and anything the program is unsure ab
 * **Adaptive smoothing:** a One-Euro filter calms a trembling hand when you are still and gets out of the way when you move fast.
 * **Click that lands where you aimed:** the pinch itself pushes your hand. The click is placed where the cursor was just *before* the pinch began.
 * **Window grab by pointing:** make a fist anywhere and the window **under your cursor** (not just the front one) follows your hand.
+* **Window commands:** thumbs-up maximises, thumbs-down minimises, a held L closes, and a fist dragged to a screen edge snaps the window to half the screen or maximises it.
 * **Every screen at once:** left, right, above, below, different sizes and DPI. The whole desktop is one area.
 * **In-the-air only:** a hand resting on a desk, your lap or your head is ignored. It starts asleep and wakes with a 1-second open palm.
 * **Stable holds:** a click-drag or a grabbed window survives pose flicker, motion blur and brief tracking loss.
 * **Optional admin face lock:** gestures only work while your enrolled face is recognised (in the source; off in the installer build).
-* **Tested without a camera:** the state machine has no camera or OS calls inside, so all 83 tests run anywhere.
+* **Tested without a camera:** the state machine has no camera or OS calls inside, so all 109 tests run anywhere.
 
 ### ❌ What It Does NOT Do
 
@@ -122,7 +140,7 @@ python -m venv .venv
 
 .venv\Scripts\python -m hexra --dry-run --rule   # try it, mouse untouched
 .venv\Scripts\python -m hexra --rule             # real control: F8 engage, F9 quit
-.venv\Scripts\python -m pytest                             # 83 tests, no camera needed
+.venv\Scripts\python -m pytest                             # 109 tests, no camera needed
 ```
 
 The hand model downloads on first run. If the optional face lock is on, the first start asks before downloading two small face models and then enrols you.
@@ -179,8 +197,9 @@ The full deep dive (every algorithm, every threshold, and every change made from
 
 ## ⚠️ Honest Limits
 
-* Most tuning (rotation, curl, jitter, lag, click drift) was validated on **simulated hands** plus 83 automated tests, not a lab of real users. The real feel depends on your camera, light and hand.
+* Most tuning (rotation, curl, jitter, lag, click drift) was validated on **simulated hands** plus 109 automated tests, not a lab of real users. The real feel depends on your camera, light and hand.
 * A fist turned fully sideways to the camera, or a scroll hand tilted backwards, was not recognised in simulation.
+* The window commands are new and were tuned on simulated hands only. A thumb held out while pointing can look like an L, which is why close needs a 1.5 s hold and shows a ring. In simulation, a frontal hand was read as a command by mistake 0% of the time (at most 2% of frames when heavily turned), and real commands were caught 99 to 100% of the time frontally and roughly 80 to 95% when the hand was turned 20 degrees.
 * One hand is used at a time; one camera (camera 0).
 * The face lock is a **convenience lock, not security**: a photo or video of you can fool it.
 * The window mover cannot move windows of programs running as administrator (Windows blocks it).
@@ -190,7 +209,7 @@ The full deep dive (every algorithm, every threshold, and every change made from
 
 ## 🗺️ Roadmap
 
-* Window commands with no shared poses: snap-to-half by dragging a grabbed window to an edge, thumbs-up maximise, thumbs-down minimise, hold-to-confirm close
+* Quarter-screen snapping into the corners
 * Two-hand resize (pinch apart / together)
 * Face lock back in the installer build
 * Smaller installer

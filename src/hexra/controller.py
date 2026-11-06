@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 
 from .filters import OneEuroFilter, PointFilter
+from .windows import snap_zone
 
 # feel presets: (min_cutoff, beta, deadzone_px). Measured filter lag at slow/medium hand speeds:
 #   smooth ~59/35 ms, balanced ~28/16 ms, responsive ~15/8 ms; steadiness at rest is the reverse.
@@ -15,7 +16,11 @@ FEEL = {"smooth": (0.5, 8.0, 5.0), "balanced": (1.0, 25.0, 4.0), "responsive": (
 DEFAULT_ACTIONS = {
     "palm": "move", "fist": "move_window", "point": "none",
     "click": "drag", "right": "right_click", "scroll": "scroll",
+    "thumb_up": "toggle_maximize", "thumb_down": "minimize", "ell": "close_window",
 }
+# Window commands: one-shot actions on the window under the cursor, fired after a timed hold (never by a single frame).
+COMMANDS = {"toggle_maximize": ("maximise", "toggle_maximize"), "minimize": ("minimise", "minimize"), "close_window": ("close", "close")}
+NEUTRAL = "_neutral"   # what the rest of the state machine sees while a command pose is being held: it does nothing
 SLOW_ACTIONS = {"drag", "right_click", "scroll", "move_window"}  # have side effects: full debounce
 MOVING = ("move", "drag", "move_window")                          # actions that carry the cursor
 CURSOR_LANDMARK = 5  # index-finger knuckle: steadier than the fingertip while pinching
@@ -53,6 +58,12 @@ class ControllerConfig:
     cursor_point: str = "index_knuckle"     # "knuckles": average of the 4 knuckles (steadier). "index_knuckle": one landmark
     click_lookback_s: float = 0.0           # relative mode: a click lands where the cursor was this long ago (0 = off)...
     click_snap_px: float = 100.0            # ...unless the cursor moved more than this since (you were really moving)
+    command_hold_s: float = 0.5             # hold thumbs-up / thumbs-down this long to maximise / minimise
+    close_hold_s: float = 1.5               # hold the L shape this long to close a window (a ring fills while you hold)
+    command_grace_s: float = 0.15           # a command pose may flicker away this long without losing its progress
+    command_cooldown_s: float = 0.8         # after a command, a fist cannot grab a window for this long
+    snap_edges: bool = True                 # releasing a fist-dragged window at a screen edge snaps it
+    snap_edge_px: float = 30.0              # ...when the cursor is within this many pixels of the edge
     scroll_gain: float = 150.0
     scroll_axis_lock: float = 2.0           # mostly-vertical (or mostly-horizontal) motion scrolls one axis only
     actions: dict = field(default_factory=lambda: dict(DEFAULT_ACTIONS))
@@ -77,6 +88,14 @@ class Controller:
         self._hist = deque()   # (t, x, y) of recent cursor positions, to undo the drift a pinch causes
         self._last_seen = 0.0
         self.note = ""        # why the last drag/grab ended (shown in the app)
+        self.hint = ""        # live hint while dragging a window, e.g. "release to snap left" (shown in the app)
+        self.cmd_progress = 0.0   # 0..1: how far a held window command (thumbs-up/down, L) is from firing
+        self.cmd_label = ""       # ...and which one ("close", "minimise", "maximise")
+        self._cmd_pose = None     # the command pose being held, when there is one
+        self._cmd_since = 0.0
+        self._cmd_seen = 0.0
+        self._cmd_fired = False   # a held command fires once; the pose must be left before it can fire again
+        self._block_until = 0.0   # a fist cannot grab a window until this time (just after a command)
         self.stable = None
         self._cand = None
         self._cand_since = 0.0   # when the current candidate pose first appeared
@@ -104,6 +123,52 @@ class Controller:
         self._last_xy = None
         self._cursor = self._rel_prev = self._raw_prev = None
         self._hist.clear()
+        self._clear_command()
+        self.hint = ""
+
+    def _clear_command(self):
+        self._cmd_pose, self._cmd_fired = None, False
+        self.cmd_progress, self.cmd_label = 0.0, ""
+
+    def _command_frame(self, pose, action, t):
+        """A window-command pose is on screen this frame: count up, fire once when the hold is complete."""
+        if pose != self._cmd_pose:
+            self._cmd_pose, self._cmd_since, self._cmd_fired = pose, t, False
+        self._cmd_seen = t
+        if self._cmd_fired:
+            return
+        label, method = COMMANDS[action]
+        hold = self.cfg.close_hold_s if action == "close_window" else self.cfg.command_hold_s
+        self.cmd_label = label
+        self.cmd_progress = min((t - self._cmd_since) / max(hold, 1e-6), 1.0)
+        if self.cmd_progress >= 1.0:
+            self._cmd_fired = True
+            result = getattr(self.windows, method)()
+            self.note = result or f"{label}: no window under the cursor to act on"
+            self.cmd_progress, self.cmd_label = 0.0, ""
+            self._block_until = t + self.cfg.command_cooldown_s
+
+    def _command_idle(self, t):
+        """No command pose this frame. A short flicker keeps the progress; a real change of pose cancels it."""
+        if self._cmd_pose is not None and t - self._cmd_seen > self.cfg.command_grace_s:
+            self._clear_command()
+
+    def _edge(self, x, y):
+        rect = self.windows.monitor_rect(x, y) or (self.cfg.screen_x, self.cfg.screen_y, self.cfg.screen_w, self.cfg.screen_h)
+        return snap_zone(x, y, rect, self.cfg.snap_edge_px)
+
+    def _snap_on_release(self):
+        """A window dragged with a fist and let go at a screen edge: left/right edge = that half, top edge = maximise."""
+        if not self.cfg.snap_edges or self._grab is None:
+            return
+        pos = getattr(self.mouse, "position", None) or self._cursor
+        if not pos:
+            return
+        mode = {"left": "left", "right": "right", "top": "maximize"}.get(self._edge(pos[0], pos[1]))
+        if mode:
+            result = self.windows.snap(mode)
+            if result:
+                self.note = result
 
     def point(self, landmarks):
         """The hand point that drives the cursor (an object with .x and .y)."""
@@ -225,6 +290,22 @@ class Controller:
             self.reset()
             return None
         self._last_seen = t
+        act_pose = self._action(pose)
+        shown = None
+        if act_pose in COMMANDS and not self.holding and t >= self._block_until:
+            self._command_frame(pose, act_pose, t)      # thumbs-up / thumbs-down / L: a timed one-shot command
+            shown, pose = pose, NEUTRAL                  # ...and the cursor, scroll and clicks do nothing meanwhile
+            if self.stable != NEUTRAL:                   # stop at once: the hand is no longer steering the cursor
+                self._enter(NEUTRAL, landmarks, t)
+                self.stable = NEUTRAL
+        elif (act_pose in COMMANDS or act_pose == "move_window") and t < self._block_until and not self.holding:
+            if pose == self._cmd_pose:
+                self._cmd_seen = t                       # still holding the pose that just fired: it stays "already fired"
+            else:
+                self._command_idle(t)
+            pose = NEUTRAL                               # just after a command: no accidental window grab or repeat
+        else:
+            self._command_idle(t)
         if pose == self._cand:
             self._count += 1
         else:
@@ -260,6 +341,8 @@ class Controller:
             if self._grab is not None:
                 gx, gy, wx, wy = self._grab
                 self.windows.move_to(wx + hx - gx, wy + hy - gy)
+                zone = self._edge(hx, hy) if self.cfg.snap_edges else None
+                self.hint = {"left": "release to snap left", "right": "release to snap right", "top": "release to maximise"}.get(zone, "")
         elif act == "scroll":
             x, y = self._scroll_filter(p.x, p.y, t)
             dx = x - self._scroll_anchor[0]       # hand right gives positive
@@ -277,7 +360,9 @@ class Controller:
                 if steps:
                     send(steps)
                     self._scroll_rem[axis] -= steps
-        return self.stable
+        if act != "move_window":
+            self.hint = ""
+        return shown or self.stable
 
     def _enter(self, pose, landmarks, t=0.0):
         old, new = self._action(self.stable), self._action(pose)
@@ -286,6 +371,7 @@ class Controller:
         if old == "drag" and new != "drag":
             self._release()
         if old == "move_window" and new != "move_window":
+            self._snap_on_release()
             self._drop_window()
         if new == "move_window":
             if old not in MOVING:
