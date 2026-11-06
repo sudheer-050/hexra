@@ -15,6 +15,8 @@ $cfg = [IO.File]::ReadAllText((Resolve-Path config.yaml).Path)
 $cfg = [regex]::Replace($cfg, "(face_lock:\s*\r?\n\s*enabled:) true", '$1 false')
 [IO.File]::WriteAllText((Join-Path (Resolve-Path $stage).Path "config.yaml"), $cfg.TrimStart([char]0xFEFF), (New-Object Text.UTF8Encoding $false))
 
+Copy-Item "$pk\app.ico" "$stage\Hexra.ico" -Force      # the windows' icon (OpenCV and the console do not inherit the exe's)
+
 # 2. the guide
 & $py "$pk\make_pdf.py" "$pk\Hexra-Guide.pdf"
 Copy-Item "$pk\Hexra-Guide.pdf" "$stage\User Guide.pdf" -Force
@@ -25,7 +27,7 @@ if (Test-Path "$pk\payload.zip") { Remove-Item "$pk\payload.zip" }
 $zip = (Resolve-Path "$pk\payload.zip").Path
 $icon = (Resolve-Path "$pk\app.ico").Path
 & $py -m PyInstaller --noconfirm --clean --onefile --windowed --name Hexra-Setup --icon $icon `
-  --distpath $pk --workpath "$pk\build_setup" --specpath $pk --add-data "${zip};." `
+  --distpath $pk --workpath "$pk\build_setup" --specpath $pk --add-data "${zip};." --add-data "${icon};." `
   --exclude-module numpy --exclude-module cv2 --exclude-module mediapipe --exclude-module matplotlib --exclude-module PIL `
   "$pk\installer.py"
 if ($LASTEXITCODE -ne 0) { throw "installer build failed" }

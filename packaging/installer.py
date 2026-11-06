@@ -114,12 +114,42 @@ def silent(argv: list[str]) -> int:
     return 0
 
 
+def set_window_icon(root) -> None:
+    """Put the Hexra icon on the wizard's window (title bar and taskbar); tkinter's own icon call does not reach the taskbar."""
+    try:
+        import ctypes
+
+        u = ctypes.windll.user32
+        u.LoadImageW.restype = ctypes.c_void_p
+        u.SendMessageW.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_void_p, ctypes.c_void_p]
+        hwnd = int(root.frame(), 16)
+        for kind, metric in ((1, 11), (0, 49)):               # ICON_BIG / SM_CXICON, ICON_SMALL / SM_CXSMICON
+            size = u.GetSystemMetrics(metric)
+            handle = u.LoadImageW(None, str(resource("app.ico")), 1, size, size, 0x10)
+            if handle:
+                u.SendMessageW(hwnd, 0x80, kind, handle)
+    except Exception:
+        pass
+
+
 def wizard() -> None:
     import tkinter as tk
     from tkinter import filedialog, messagebox, ttk
 
+    try:
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Hexra.Setup")   # its own taskbar identity
+    except Exception:
+        pass
     root = tk.Tk()
     root.title(f"{APP} Setup")
+    try:
+        root.iconbitmap(default=str(resource("app.ico")))          # the Hexra icon in the title bar and taskbar, not tkinter's
+    except Exception:
+        pass
+    root.update_idletasks()
+    set_window_icon(root)
     root.resizable(False, False)
     pad = {"padx": 18}
     ttk.Label(root, text=f"Install {APP} {VERSION}", font=("Segoe UI", 15, "bold")).pack(anchor="w", pady=(16, 2), **pad)

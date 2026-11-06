@@ -20,6 +20,7 @@ from .camera import ThreadedCamera
 from .controller import FEEL, Controller, ControllerConfig
 from .display import Display
 from .face_lock import DEFAULTS as FACE_LOCK_DEFAULTS
+from . import icon
 from .features import normalize
 from .gate import AirGate
 from .poses import MLRecognizer, RuleRecognizer
@@ -92,6 +93,8 @@ def main() -> None:
                         handlers=[logging.StreamHandler(), logging.FileHandler("data/last_run.log", mode="w", encoding="utf-8")])
 
     enable_dpi_awareness()
+    icon.set_app_id()                                  # the taskbar shows Hexra's icon, not Python's
+    icon.apply_to_console()
     cfg = load_config(args.config)
     if not Path(args.config).exists():
         cfg.screen_x, cfg.screen_y, cfg.screen_w, cfg.screen_h = screen_rect()

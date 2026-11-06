@@ -10,6 +10,8 @@ import threading
 
 import cv2
 
+from . import icon
+
 
 class Display:
     def __init__(self, title: str):
@@ -18,6 +20,7 @@ class Display:
         self._frame = None
         self._stop = False
         self._keys: queue.SimpleQueue = queue.SimpleQueue()
+        self._icon_done = False
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
@@ -45,6 +48,9 @@ class Display:
                 frame, self._frame = self._frame, None
             if frame is not None:
                 cv2.imshow(self.title, frame)
+                if not self._icon_done:                  # the window exists now: give it the Hexra icon (title bar and taskbar)
+                    self._icon_done = True
+                    icon.apply_to_window(self.title)
             key = cv2.waitKey(1) & 0xFF
             if key != 255:
                 self._keys.put(key)
