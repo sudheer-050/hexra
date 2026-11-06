@@ -63,6 +63,7 @@ class ControllerConfig:
     command_grace_s: float = 0.15           # a command pose may flicker away this long without losing its progress
     command_cooldown_s: float = 0.8         # after a command, a fist cannot grab a window for this long
     grab_move_px: float = 30.0              # a fist only takes hold of a window once the hand has moved this far (0 = at once)
+    use_calibration: bool = True            # use the poses learned from the user's own hand (data/calibration.npz) when there is a calibration
     thumb_guard_s: float = 0.6              # after a thumbs pose, a fist cannot grab a window for this long (a hand relaxing)
     snap_edges: bool = True                 # releasing a fist-dragged window at a screen edge snaps it
     snap_edge_px: float = 30.0              # ...when the cursor is within this many pixels of the edge

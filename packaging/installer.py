@@ -16,7 +16,7 @@ import threading
 import zipfile
 from pathlib import Path
 
-APP, VERSION = "Hexra", "1.6.0"
+APP, VERSION = "Hexra", "1.7.0"
 UNINSTALL_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Hexra"
 KEEP_IF_EXISTS = {"config.yaml"}           # the user's own settings are never overwritten by a re-install
 NO_WINDOW = 0x08000000

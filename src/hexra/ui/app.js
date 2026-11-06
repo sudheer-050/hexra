@@ -172,10 +172,17 @@ function overview() {
       h("button", { class: "btn", onclick: restoreBackup }, "Go back to the previous saved version"),
       h("span", { class: "muted small" }, "Settings file: " + (state.info.paths || {}).config)))];
 }
+function calibCard() {
+  const c = (state.info.calibration || {}), rep = c.report;
+  return h("div", { class: "card" }, h("div", { class: "row" }, h("div", {}, h("h2", {}, c.exists ? "Calibrated to your hand" : "Not calibrated yet"),
+      h("p", { class: "muted", style: "margin:2px 0 0" }, c.exists ? `Hexra recognises ${((rep || {}).poses || []).length || "your"} poses from examples of your own hand.` : "Hexra is using the standard rules for an average hand. Calibrating takes about two minutes and fixes mix-ups such as a fist read as a click.")),
+    h("button", { class: "btn" + (c.exists ? "" : " primary"), onclick: () => { state.page = "calibrate"; state.enter = true; render(false); } }, c.exists ? "Calibrate again" : "Calibrate now")));
+}
 function groupPage(g) {
   const list = g.settings.filter(s => state.advanced || !s.advanced || changedIds().includes(s.id));
   const hidden = g.settings.length - list.length;
   return [...header(g.label, g.desc),
+    g.id === "gestures" ? calibCard() : null,
     h("div", { class: "card" }, g.id === "gestures" ? gesturesList(list) : list.map(card),
       hidden ? h("p", { class: "muted small", style: "margin:14px 0 0" }, `${hidden} more advanced setting${hidden > 1 ? "s" : ""} hidden. `, h("button", { class: "btn link", onclick: () => { state.advanced = true; persistAdv(); render(true); } }, "Show advanced")) : null)];
 }
@@ -191,6 +198,60 @@ function searchPage() {
   const hits = allSettings().filter(s => matches(s, q));
   return [...header("Search results", hits.length ? `${hits.length} setting${hits.length > 1 ? "s" : ""} match “${state.q}”.` : `Nothing matches “${state.q}”.`),
     hits.length ? h("div", { class: "card" }, hits.map(s => h("div", {}, h("div", { class: "def", style: "margin-top:6px" }, state.schema.groups.find(g => g.settings.includes(s)).label), card(s)))) : null];
+}
+const POSE_NAMES = { palm: "Open palm", fist: "Fist", thumb_up: "Thumbs-up", thumb_down: "Thumbs-down", click: "Pinch", point: "One finger", scroll: "Two fingers", right: "Three fingers", ell: "L shape" };
+const pn = p => POSE_NAMES[p] || p;
+async function refreshInfo() { try { const s = await api("/api/state"); state.info = s; state.eng = s.engine; } catch (e) {} }
+async function startCalibration() {
+  try { await api("/api/calibrate/start", {}); try { localStorage.removeItem("hexra-calib-skip"); } catch (e) {} await pollStatus(); }
+  catch (e) { toast(e.message, true); }
+}
+async function finishCalibration() { try { await api("/api/engine/stop", {}); } catch (e) {} await refreshInfo(); state.page = "gestures"; state.enter = true; render(false); toast("Calibration saved. Hexra now reads poses from your own hand."); }
+async function resetCalibration() {
+  if (!confirm("Forget your calibration and go back to the standard rules?")) return;
+  try { const r = await api("/api/calibrate/reset", {}); state.info.calibration = r.calibration; render(true); toast("Calibration removed."); } catch (e) { toast(e.message, true); }
+}
+function resultBlock(rep) {
+  const acc = rep.accuracy || {}, mix = rep.mixups || [];
+  const rows = Object.entries(acc).map(([p, a]) => h("div", { class: "row", style: "align-items:center;padding:6px 0" }, h("span", {}, pn(p)),
+    h("span", { class: "chip " + (a >= 0.9 ? "good" : a >= 0.75 ? "neutral" : "warn") }, `${Math.round(a * 100)}% sure`)));
+  const tips = mix.map(m => h("div", { class: "err" }, `Your ${pn(m.pose).toLowerCase()} and ${pn(m.looks_like).toLowerCase()} look alike (${Math.round(m.share * 100)}% mix-ups). Make them more different when you use them: for a fist keep the thumb over the fingers; for a pinch spread the other fingers.`));
+  const skipped = (rep.skipped || []).length ? h("p", { class: "muted small" }, "Not recorded (I could not see your hand): " + rep.skipped.map(pn).join(", ") + ". The standard rules handle those.") : null;
+  return h("div", {}, rows, tips, skipped);
+}
+function calibratePage() {
+  const e = state.eng, c = e.calib, info = state.info.calibration || {};
+  const head = header("Calibrate to your hand", "Hexra learns what your poses look like, so a fist stays a fist and a thumbs-up stays a thumbs-up.");
+  if (e.running && e.calibrating && c && !c.report) {                                   // in the middle of it
+    const left = Math.max(0, Math.ceil(c.seconds - c.elapsed)), ready = c.phase === "ready";
+    const steps = Object.keys(POSE_NAMES).map((p, i) => h("div", { class: "cstep" + (i === c.step ? " now" : "") + (c.done_poses.includes(p) ? " ok" : "") + (c.skipped.includes(p) ? " skip" : "") },
+      h("span", { class: "tick" }, c.done_poses.includes(p) ? "✓" : c.skipped.includes(p) ? "–" : String(i + 1)), pn(p)));
+    return [...head, h("div", { class: "card cbig" }, h("div", { class: "muted small" }, `Step ${Math.min(c.step + 1, c.total)} of ${c.total}`),
+        h("h1", { style: "margin:4px 0 6px" }, c.title), h("p", { class: "sub", style: "margin:0 0 14px" }, c.do),
+        h("div", { class: "ccount " + (ready ? "ready" : "hold") }, ready ? `Get ready… ${left}` : `Hold it… ${left}`),
+        h("div", { class: "cbar" }, h("i", { style: `width:${Math.min(100, (c.elapsed / c.seconds) * 100)}%` })),
+        h("p", { class: "muted", style: "margin:10px 0 0" }, ready ? (c.message || "Look at the camera and get into the pose.") : c.hint),
+        h("p", { class: "muted small" }, ready ? "" : `Seen so far: ${c.collected} frames`)),
+      h("div", { class: "card" }, h("div", { class: "csteps" }, steps)),
+      h("button", { class: "btn", onclick: async () => { try { await api("/api/engine/stop", {}); } catch (x) {} await pollStatus(); } }, "Cancel")];
+  }
+  if (e.running && e.calibrating && c && c.report) {                                      // finished: show how well it went
+    const rep = c.report;
+    return [...head, h("div", { class: "card" }, h("h2", {}, rep.saved ? "Done. Here is how well Hexra knows your hand." : "Nothing was recorded"),
+        rep.saved ? h("p", { class: "muted", style: "margin:2px 0 12px" }, "Higher is better. Anything under 90% is a pose Hexra may mix up with another.") : h("p", { class: "muted" }, rep.message || ""),
+        rep.saved ? resultBlock(rep) : null),
+      h("div", { class: "tools" }, h("button", { class: "btn primary", onclick: finishCalibration }, "Finish"), h("button", { class: "btn", onclick: startCalibration }, "Calibrate again"))];
+  }
+  const intro = h("div", { class: "card" }, h("h2", {}, info.exists ? "Calibrated" : "Let's set Hexra up for your hand"),
+    h("p", { class: "muted", style: "margin:2px 0 10px" }, info.exists ? "You can calibrate again any time, for example if poses are being mixed up or you changed camera position."
+      : "Everyone's hand is a little different: for some people a fist has the thumb tucked against the index finger, which a rule-based app can mistake for a click. Show Hexra each pose once and it learns yours."),
+    h("ol", { class: "clist" }, Object.keys(POSE_NAMES).map(p => h("li", {}, pn(p)))),
+    h("p", { class: "muted small" }, "About two minutes. Sit where you normally sit and keep your hand in view of the camera. The mouse is not touched."),
+    h("div", { class: "tools", style: "margin:12px 0 0" }, h("button", { class: "btn primary", disabled: e.running && !e.calibrating, onclick: startCalibration }, info.exists ? "Calibrate again" : "Start calibration"),
+      !info.exists ? h("button", { class: "btn", onclick: () => { try { localStorage.setItem("hexra-calib-skip", "1"); } catch (x) {} state.page = "overview"; state.enter = true; render(false); } }, "Skip for now") : null,
+      info.exists ? h("button", { class: "btn link", onclick: resetCalibration }, "Forget my calibration") : null),
+    e.running && !e.calibrating ? h("p", { class: "muted small" }, "Starting will stop Hexra's normal control for the few minutes it takes.") : null);
+  return [...head, intro, info.exists && info.report ? h("div", { class: "card" }, h("h2", {}, "Your last calibration"), resultBlock(info.report)) : null];
 }
 let logTimer;
 function activityPage() {
@@ -222,8 +283,8 @@ function render(keepScroll) {
   const top = main.scrollTop;
   const before = camView.getBoundingClientRect();
   if (camCard.parentElement !== sideSlot) sideSlot.append(camCard);        // keep the camera alive while the page is rebuilt
-  const page = state.q ? searchPage() : state.page === "overview" ? overview() : state.page === "activity" ? activityPage() : groupPage(state.schema.groups.find(g => g.id === state.page));
-  const tools = state.page !== "activity" || state.q ? h("div", { class: "tools" },
+  const page = state.q ? searchPage() : state.page === "overview" ? overview() : state.page === "activity" ? activityPage() : state.page === "calibrate" ? calibratePage() : groupPage(state.schema.groups.find(g => g.id === state.page));
+  const tools = !["activity", "calibrate"].includes(state.page) || state.q ? h("div", { class: "tools" },
     h("input", { class: "search", type: "search", placeholder: "Search every setting…", value: state.q, "aria-label": "Search settings", id: "q" }),
     h("label", { class: "switch-row" }, h("button", { class: "toggle", role: "switch", "aria-checked": state.advanced ? "true" : "false", "aria-label": "Show advanced settings", onclick: () => { state.advanced = !state.advanced; persistAdv(); render(true); } }), "Advanced")) : null;
   main.replaceChildren(h("div", { class: "page" + (state.enter ? " enter" : "") }, page[0], page[1], tools, ...page.slice(2)));
@@ -237,14 +298,14 @@ function render(keepScroll) {
 }
 function persistAdv() { try { localStorage.setItem("hexra-advanced", state.advanced ? "1" : "0"); } catch (e) {} }
 
-const SHORT = { cursor: "Cursor", clicks: "Clicks", windows: "Windows", gestures: "Gestures", presence: "Presence", camera: "Camera", general: "Startup" };
+const SHORT = { calibrate: "Calibrate", cursor: "Cursor", clicks: "Clicks", windows: "Windows", gestures: "Gestures", presence: "Presence", camera: "Camera", general: "Startup" };
 function renderNav() {
   const ch = changedIds();
   const ordered = [...state.schema.groups.filter(g => g.id !== "general"), ...state.schema.groups.filter(g => g.id === "general")];   // Startup after the tuning pages
-  const items = [["overview", "Overview", "home"], ...ordered.map(g => [g.id, g.label, g.icon]), ["activity", "Activity", "pulse"]];
+  const items = [["overview", "Overview", "home"], ...ordered.map(g => [g.id, g.label, g.icon]), ["calibrate", "Calibrate", "hand"], ["activity", "Activity", "pulse"]];
   nav.replaceChildren(...items.map(([id, label, ic]) => {
-    const n = id === "overview" || id === "activity" ? 0 : state.schema.groups.find(g => g.id === id).settings.filter(s => ch.includes(s.id)).length;
-    return h("button", { "aria-current": state.page === id && !state.q ? "page" : "false", onclick: () => { state.page = id; state.q = ""; state.enter = true; render(false); main.scrollTop = 0; main.focus(); } }, SHORT[id] || label, n ? h("span", { class: "badge-n" }, n) : null);
+    const n = id === "overview" || id === "activity" || id === "calibrate" ? 0 : state.schema.groups.find(g => g.id === id).settings.filter(s => ch.includes(s.id)).length;
+    return h("button", { "aria-current": state.page === id && !state.q ? "page" : "false", onclick: async () => { state.page = id; state.q = ""; state.enter = true; if (id === "calibrate") { try { state.info.calibration = (await api("/api/state")).calibration; } catch (e) {} } render(false); main.scrollTop = 0; main.focus(); } }, SHORT[id] || label, n ? h("span", { class: "badge-n" }, n) : null);
   }));
 }
 function updateSave() {
@@ -273,10 +334,17 @@ async function engineStart(dry, restart) {
 async function onStartStop() {
   if (state.eng.running) { try { await api("/api/engine/stop", {}); } catch (e) { toast(e.message, true); } await pollStatus(); return; }
   if (!await save()) return;
-  if (!state.eng.running) await engineStart($("#cam-dry").checked, false);
+  if (!state.eng.running) await engineStart(false, false);
 }
 async function pollStatus() {
   try { state.eng = await api("/api/status"); } catch (e) { state.eng = { running: false, error: "Lost contact with the Hexra window. Close it and open Hexra again." }; }
+  const calibrating = !!(state.eng.running && state.eng.calibrating), hasReport = !!(state.eng.calib && state.eng.calib.report);
+  if ((state.wasCalibrating && !calibrating) || (hasReport && !state.reportSeen)) {          // it just finished, or was stopped: what is saved may have changed
+    state.reportSeen = hasReport;
+    try { const s = await api("/api/state"); state.info.calibration = s.calibration; state.calibKey = null; } catch (e) {}
+  }
+  if (!hasReport) state.reportSeen = false;
+  state.wasCalibrating = calibrating;
   updateCam();
 }
 let camOn = false;
@@ -285,9 +353,7 @@ function updateCam() {
   if (e.running && !camOn) { img.src = `/preview.mjpg?t=${encodeURIComponent(TOKEN)}&n=${Date.now()}`; camOn = true; }
   if (!e.running && camOn) { img.removeAttribute("src"); camOn = false; }
   img.hidden = !e.running; $("#cam-off").hidden = !!e.running;
-  $("#cam-dry").disabled = !!e.running;
-  $("#cam-start").textContent = e.running ? "Stop" : "Start Hexra";
-  $("#cam-start").className = e.running ? "btn" : "btn primary";
+  $("#cam-stop").hidden = !e.running;                       // Start lives on the camera picture; Pause and Stop are at the bottom
   const tg = $("#cam-toggle"); tg.hidden = !e.running || e.dry || e.starting; tg.textContent = e.engaged ? "Pause" : "Resume";
   let label = "Off", t = "neutral", more = "";
   if (e.running) {
@@ -297,6 +363,7 @@ function updateCam() {
     else { label = "Paused"; t = "warn"; }
     if (!e.starting) more = `${e.pose || "no hand"} · ${e.fps || 0} fps` + (e.cams ? ` · ${e.cams}` : "");
   } else if (e.exit_code) { label = "Stopped"; t = "warn"; }
+  if (e.calibrating) { label = "Calibrating"; t = "neutral"; more = ""; }
   chip.className = "chip " + t; chip.textContent = label; text.textContent = more;
   $("#cam-status").hidden = !e.running && !e.exit_code;      // when it is off the picture area already says so
   let msg = "";
@@ -307,6 +374,7 @@ function updateCam() {
   else if (!e.running && e.exit_code) msg = "Hexra stopped unexpectedly. See Activity for details.";
   note.hidden = !msg; note.textContent = msg;
   if (state.page === "overview" && !state.q && state.lastRunning !== !!e.running) { state.lastRunning = !!e.running; render(true); }
+  if (state.page === "calibrate" && !state.q) { const key = JSON.stringify([!!(state.info.calibration || {}).exists, !!e.running, !!e.calibrating, e.calib && [e.calib.step, e.calib.phase, Math.ceil(e.calib.seconds - e.calib.elapsed), e.calib.collected, !!e.calib.report]]); if (key !== state.calibKey) { state.calibKey = key; render(true); } }
 }
 
 function resetAll() {
@@ -322,8 +390,9 @@ saveBtn.addEventListener("click", save);
 document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(); } });
 window.addEventListener("beforeunload", e => { if (changedIds().length) { e.preventDefault(); e.returnValue = ""; } });
 setInterval(() => api("/api/ping", {}).catch(() => {}), 8000);
-setInterval(pollStatus, 1000);
+(function pollLoop() { pollStatus().finally(() => setTimeout(pollLoop, state.eng && state.eng.calibrating ? 300 : 1000)); })();
 $("#cam-start").addEventListener("click", onStartStop);
+$("#cam-stop").addEventListener("click", onStartStop);
 $("#cam-toggle").addEventListener("click", async () => { try { await api("/api/engine/toggle", {}); } catch (e) { toast(e.message, true); } });
 window.addEventListener("pagehide", () => { try { navigator.sendBeacon("/api/closing?t=" + encodeURIComponent(TOKEN), "{}"); } catch (e) {} });
 
@@ -332,7 +401,10 @@ window.addEventListener("pagehide", () => { try { navigator.sendBeacon("/api/clo
     const s = await api("/api/state");
     state.schema = s.schema; state.saved = s.values; state.draft = JSON.parse(JSON.stringify(s.values)); state.defaults = s.defaults; state.info = s; state.eng = s.engine;
     const want = decodeURIComponent(location.hash.slice(1));
-    if (want === "activity" || state.schema.groups.some(g => g.id === want)) state.page = want;
+    if (want === "activity" || want === "calibrate" || state.schema.groups.some(g => g.id === want)) state.page = want;
+    let skipped = false;
+    try { skipped = localStorage.getItem("hexra-calib-skip") === "1"; } catch (x) {}
+    if (!(s.calibration || {}).exists && !skipped && !s.engine.running) { state.page = "calibrate"; setTimeout(() => toast("Let's calibrate Hexra to your hand first."), 600); }
     state.enter = true;
     render(false);
   } catch (e) { main.replaceChildren(h("div", { class: "page" }, h("h1", {}, "Settings could not load"), h("p", { class: "sub" }, e.message))); }

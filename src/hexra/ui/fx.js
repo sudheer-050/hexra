@@ -11,59 +11,63 @@
   applyFx();
   if (fxBtn) fxBtn.addEventListener("click", () => { fxOn = !fxOn; try { localStorage.setItem("hexra-fx", fxOn ? "1" : "0"); } catch (e) {} applyFx(); if (fxOn) kick(); });
 
-  // ---- perspective grid floor + drifting light, on a half-resolution canvas at about 24 frames a second
+  // ---- hyperdrive: a starfield rushing past (after the 21st.dev "Hyperdrive" hero), on a half-resolution canvas at about 24 frames a second
   const cv = $("#bg"), g = cv.getContext("2d");
-  const S = 0.5;
-  let W = 0, H = 0, phase = 0, last = 0, raf = 0, px = 0.5, py = 0.5, tx = 0.5, ty = 0.5;
-  const stars = Array.from({ length: 90 }, () => ({ x: Math.random(), y: Math.random() * 0.56, r: Math.random() * 1.3 + 0.3, s: Math.random() * 6.28, v: Math.random() * 0.00004 + 0.00001 }));
-  const orbs = [{ c: "138,125,255", x: 0.15, y: 0.3, r: 0.42, p: 0 }, { c: "63,224,255", x: 0.85, y: 0.22, r: 0.36, p: 2 }, { c: "255,93,224", x: 0.6, y: 0.7, r: 0.4, p: 4 }];
-  function resize() { W = cv.width = Math.max(2, Math.round(innerWidth * S)); H = cv.height = Math.max(2, Math.round(innerHeight * S)); }
+  const S = 0.5, R = Math.random, TAU = Math.PI * 2;
+  let W = 0, H = 0, last = 0, raf = 0, speed = 2, aim = 2, px = 0.5, py = 0.5, tx = 0.5, ty = 0.5;
+  const NUM = 900;
+  const stars = [];
+  const orbs = [{ c: "70,140,255", x: 0.14, y: 0.3, r: 0.46, p: 0 }, { c: "90,200,255", x: 0.86, y: 0.2, r: 0.4, p: 2 }, { c: "60,110,230", x: 0.55, y: 0.78, r: 0.46, p: 4 }, { c: "110,170,255", x: 0.4, y: 0.12, r: 0.3, p: 1 }];
+  function place(s, anywhere) {
+    s.x = (R() - 0.5) * W; s.y = (R() - 0.5) * H;
+    s.z = anywhere ? R() * W : W;                 // distance: far stars start at the back and fly toward you
+    s.pz = s.z;
+  }
+  function resize() {
+    W = cv.width = Math.max(2, Math.round(innerWidth * S)); H = cv.height = Math.max(2, Math.round(innerHeight * S));
+    stars.length = 0;
+    for (let i = 0; i < NUM; i++) { const s = {}; place(s, true); stars.push(s); }
+  }
   addEventListener("resize", () => { resize(); if (!raf) draw(performance.now(), true); });
   resize();
-  document.addEventListener("pointermove", e => { tx = e.clientX / innerWidth; ty = e.clientY / innerHeight; }, { passive: true });
+  document.addEventListener("pointermove", e => {
+    tx = e.clientX / innerWidth; ty = e.clientY / innerHeight;
+    aim = 2 + (1 - Math.abs(e.clientX - innerWidth / 2) / (innerWidth / 2)) * 6.5;          // the closer to the middle, the faster you fly
+  }, { passive: true });
 
   function draw(now, still) {
+    const dt = still ? 0 : Math.min(0.2, (now - (draw.t || now)) / 1000); draw.t = now;
     px += (tx - px) * 0.05; py += (ty - py) * 0.05;
+    speed += (aim - speed) * Math.min(1, dt * 2);
     g.clearRect(0, 0, W, H);
-    const hy = H * (0.56 + (py - 0.5) * 0.03), vx = W * (0.5 + (px - 0.5) * 0.12);
-    // soft moving lights
+    // soft coloured lights: these are what shows through the glass
     for (const o of orbs) {
-      const ox = (o.x + Math.sin(now / 9000 + o.p) * 0.05) * W, oy = (o.y + Math.cos(now / 11000 + o.p) * 0.04) * H, r = o.r * Math.max(W, H);
+      const ox = (o.x + Math.sin(now / 9000 + o.p) * 0.06) * W, oy = (o.y + Math.cos(now / 11000 + o.p) * 0.05) * H, r = o.r * Math.max(W, H);
       const gr = g.createRadialGradient(ox, oy, 0, ox, oy, r);
-      gr.addColorStop(0, `rgba(${o.c},0.16)`); gr.addColorStop(1, `rgba(${o.c},0)`);
+      gr.addColorStop(0, `rgba(${o.c},0.24)`); gr.addColorStop(1, `rgba(${o.c},0)`);
       g.fillStyle = gr; g.fillRect(0, 0, W, H);
     }
-    // stars
+    // the stars: each streaks from where it was to where it is now, away from the vanishing point (which follows your pointer a little)
+    const cx = W / 2 + (px - 0.5) * W * 0.12, cy = H / 2 + (py - 0.5) * H * 0.12;
+    g.lineCap = "round";
     for (const s of stars) {
-      const a = 0.35 + 0.65 * Math.abs(Math.sin(now * s.v * 40 + s.s));
-      g.fillStyle = `rgba(190,215,255,${a * 0.7})`;
-      g.fillRect(s.x * W, s.y * H, s.r, s.r);
+      if (dt > 0) { s.z -= speed * 60 * S * dt; if (s.z < 1) place(s, false); }
+      const k = (still ? 1.02 : 1);
+      const sx = (s.x / s.z) * W / 2 + cx, sy = (s.y / s.z) * H / 2 + cy;
+      const pz = still ? s.z * k : s.pz;
+      const ox = (s.x / pz) * W / 2 + cx, oy = (s.y / pz) * H / 2 + cy;
+      s.pz = s.z;
+      if (sx < -20 || sx > W + 20 || sy < -20 || sy > H + 20) { if (dt > 0) place(s, false); continue; }
+      const depth = 1 - s.z / W;                                           // 0 far, 1 near
+      g.strokeStyle = `rgba(225,238,255,${Math.min(1, 0.18 + depth * 0.95)})`;
+      g.lineWidth = Math.max(0.4, depth * 2.4);
+      g.beginPath(); g.moveTo(ox, oy); g.lineTo(sx, sy); g.stroke();
     }
-    // the floor: lines that rush toward you
-    const near = (W / 5.2);
-    g.lineWidth = 1;
-    for (let i = -14; i <= 14; i++) {
-      const a = Math.max(0.05, 0.32 - Math.abs(i) * 0.016);
-      const gr = g.createLinearGradient(0, hy, 0, H);
-      gr.addColorStop(0, "rgba(63,224,255,0)"); gr.addColorStop(1, `rgba(138,125,255,${a})`);
-      g.strokeStyle = gr;
-      g.beginPath(); g.moveTo(vx + i * near * 0.06, hy); g.lineTo(vx + i * near, H); g.stroke();
-    }
-    const K = 16;
-    for (let k = 0; k < K; k++) {
-      const z = ((k + phase) % K) / K, y = hy + (H - hy) * Math.pow(z, 2.3);
-      g.strokeStyle = `rgba(63,224,255,${0.04 + z * 0.3})`;
-      g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
-    }
-    // horizon glow
-    const hg = g.createLinearGradient(0, hy - 24, 0, hy + 24);
-    hg.addColorStop(0, "rgba(255,93,224,0)"); hg.addColorStop(0.5, "rgba(138,125,255,0.45)"); hg.addColorStop(1, "rgba(63,224,255,0)");
-    g.fillStyle = hg; g.fillRect(0, hy - 24, W, 48);
   }
   function loop(now) {
     raf = 0;
     if (body.classList.contains("fx-off")) return;
-    if (!document.hidden && now - last >= 41) { phase += (now - last) * 0.0006; last = now; draw(now); }
+    if (!document.hidden && now - last >= 41) { last = now; draw(now); }
     raf = requestAnimationFrame(loop);
   }
   function kick() { if (!raf && !body.classList.contains("fx-off")) raf = requestAnimationFrame(loop); }
@@ -76,9 +80,9 @@
     stage.addEventListener("pointermove", e => {
       if (body.classList.contains("fx-off")) return;
       const r = stage.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
-      view.style.setProperty("--ry", (3 + x * 8).toFixed(2) + "deg"); view.style.setProperty("--rx", (-y * 6).toFixed(2) + "deg");
+      view.style.setProperty("--ry", (2 + x * 5).toFixed(2) + "deg"); view.style.setProperty("--rx", (-y * 3).toFixed(2) + "deg");
     });
-    stage.addEventListener("pointerleave", () => { view.style.setProperty("--ry", "3deg"); view.style.setProperty("--rx", "0deg"); });
+    stage.addEventListener("pointerleave", () => { view.style.setProperty("--ry", "2deg"); view.style.setProperty("--rx", "0deg"); });
     const cam = $("#cam");
     const live = () => stage.classList.toggle("live", !cam.hidden);
     new MutationObserver(live).observe(cam, { attributes: true, attributeFilter: ["hidden"] });

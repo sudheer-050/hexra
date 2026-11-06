@@ -30,7 +30,7 @@ def write_atomic(path: Path, payload: bytes) -> bool:
 
 def write_status(base: Path, **fields) -> None:
     fields["time"] = time.time()
-    write_atomic(base / STATUS, json.dumps(fields).encode("utf-8"))
+    write_atomic(base / STATUS, json.dumps(fields, default=float).encode("utf-8"))
 
 
 def read_status(base: Path, max_age_s: float = 3.0) -> dict:

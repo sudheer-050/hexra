@@ -27,6 +27,8 @@ from . import icon
 from .features import normalize
 from .gate import AirGate
 from .poses import MLRecognizer, RuleRecognizer
+from .calibration import Calibrator
+from .personal import PersonalModel, PersonalRecognizer, build as build_personal, save_report
 from .screen import enable_dpi_awareness, list_monitors, screen_rect
 from .tracker import HandTracker, ensure_model
 from .windows import NullMover, make_mover
@@ -63,7 +65,7 @@ def load_config(path: str) -> ControllerConfig:
                 "scroll_gain", "scroll_axis_lock", "rel_gain_min", "rel_gain_max", "rel_v_low", "rel_v_high",
                 "rel_softness", "rel_max_jump", "click_lookback_s", "click_snap_px",
                 "command_hold_s", "close_hold_s", "command_grace_s", "command_cooldown_s", "snap_edges", "snap_edge_px",
-                "grab_move_px", "thumb_guard_s"):
+                "grab_move_px", "thumb_guard_s", "use_calibration"):
         if key in data:
             setattr(cfg, key, type(getattr(cfg, key))(data[key]))
     cfg.actions.update(data.get("actions", {}))
@@ -94,9 +96,12 @@ def main() -> None:
     ap.add_argument("--config", default="config.yaml")
     ap.add_argument("--embed", action="store_true", help="run as the engine of the Hexra app: the picture goes to the app window, not a window of its own")
     ap.add_argument("--engage", action="store_true", help="start with control engaged (the app's Start button)")
+    ap.add_argument("--calibrate", action="store_true", help="walk through the poses and learn this user's hand (never moves the mouse)")
     ap.add_argument("--parent", type=int, default=0, help="quit when this process (the app window) is gone")
     args = ap.parse_args()
     Path("data").mkdir(exist_ok=True)
+    if args.calibrate:
+        args.dry_run = True                                  # calibration never moves the mouse
     logging.basicConfig(level=logging.INFO, format="%(message)s", force=True,
                         handlers=[logging.StreamHandler(), logging.FileHandler("data/last_run.log", mode="w", encoding="utf-8")])
 
@@ -117,7 +122,15 @@ def main() -> None:
             log.info("No trained model yet (run calibrate, then train). Using the rule-based recogniser.")
     else:
         recog, name = MLRecognizer.load(str(model_path)), "trained"
+    cal_file = Path("data") / "calibration.npz"
+    if not args.calibrate and cfg.use_calibration and cal_file.exists():
+        try:
+            recog, name = PersonalRecognizer(PersonalModel.load(cal_file), RuleRecognizer()), "your own hand (calibration)"
+        except Exception as exc:
+            log.warning("Could not read your calibration (%s): using the standard rules. Calibrate again to fix it.", exc)
     log.info("Recogniser: %s", name)
+    calib = Calibrator() if args.calibrate else None
+    calib_report = None
 
     lock = None
     lock_opts = {**FACE_LOCK_DEFAULTS, **cfg.face_lock}
@@ -210,15 +223,29 @@ def main() -> None:
                 frame, t = got                       # t = the moment the camera captured this frame
                 frame = cv2.flip(frame, 1)
                 det = tracker.detect(frame, int(t * 1000))
-            pose, lm = None, None
+            pose, lm, feats = None, None, None
             if det:
                 lm = det[0]
                 try:
-                    pose = recog.predict_features(normalize(lm, det[1]))     # finger shape: from the camera with the better view
+                    feats = normalize(lm, det[1])
+                    pose = recog.predict_features(feats)                     # finger shape: from the camera with the better view
                 except ValueError:
-                    pose = None
+                    pose, feats = None, None
                 if multi:
                     lm = det[2]                                              # position: the fused hand, in camera 1's frame
+            if calib is not None:
+                calib.update(feats, t)
+                if calib.done and calib_report is None:
+                    calib_report = {"saved": False, "message": "No poses could be recorded: I could not see your hand."}
+                    if calib.samples:
+                        model, rep = build_personal(calib.samples)
+                        model.save(cal_file)
+                        rep.update(saved=True, skipped=calib.skipped, time=time.time())
+                        save_report(Path("data") / "calibration_report.json", rep)
+                        calib_report = rep
+                        log.info("Calibration saved: %s", {p: round(a, 2) for p, a in rep["accuracy"].items()})
+                    else:
+                        log.info("Calibration recorded nothing.")
             if lock is not None:
                 lock.submit(frame, t)                     # a background thread checks the picture; this never waits
                 if not lock.allowed(t):
@@ -303,7 +330,8 @@ def main() -> None:
                 next_status = time.monotonic() + 0.25
                 ipc.write_status(base, engaged=engaged.is_set(), pose=stable or "", fps=round(min(fps, 240)), lat_ms=round(lat_ms), dry=bool(args.dry_run),
                                  asleep=bool(gate.enabled and not gate.awake), away=looking_away, note=shown_note if time.monotonic() < note_until else "",
-                                 hint=ctl.hint or "", cams=cams_mode)
+                                 hint=ctl.hint or "", cams=cams_mode,
+                                 calib=(dict(calib.snapshot(), report=calib_report) if calib is not None else None))
             quit_now = False
             for key in display.keys():
                 if key == ord("q"):

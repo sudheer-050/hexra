@@ -165,6 +165,9 @@ GROUPS = [
         "id": "gestures", "label": "Gestures", "icon": "hand",
         "desc": "Choose what each hand pose does. Every pose can be reassigned or switched off.",
         "settings": [
+            boolean("use_calibration", "Use my hand calibration", "Recognise poses from the examples of your own hand recorded in the Calibrate tab (a fist with the thumb tucked, your thumbs-up, and so on). Off: the standard rules for an average hand. Has no effect until you have calibrated.", True,
+                    note("No added delay.", "neutral", "calculated")),
+        ] + [
             {"id": f"actions.{pid}", "type": "action", "label": label, "desc": f"{how[0].upper()}{how[1:]}.", "default": default, "options": [],
              "impact": {"kind": "action"}, "advanced": False, "pose": pid}
             for pid, label, how, default in POSES

@@ -23,16 +23,15 @@
       <div id="cam-slot-side"><div class="cam" id="cam-card">
         <div class="cam-view">
           <img id="cam" alt="Live camera view with the detected hand" hidden>
-          <div id="cam-off" class="cam-off"><div class="rings" aria-hidden="true"><i></i><i></i><i></i></div><span>Camera is off</span></div>
+          <div id="cam-off" class="cam-off"><div class="rings" aria-hidden="true"><i></i><i></i><i></i></div><span>Camera is off</span><button id="cam-start" class="btn accent big">Start Hexra</button></div>
           <i class="br tl" aria-hidden="true"></i><i class="br tr" aria-hidden="true"></i><i class="br bl" aria-hidden="true"></i><i class="br brr" aria-hidden="true"></i>
           <div class="sweep" aria-hidden="true"></div>
           <div class="hud" id="cam-status" hidden><span id="cam-chip" class="chip neutral">Off</span><span id="cam-text" class="hud-text"></span></div>
           <p id="cam-note" class="cam-note" hidden></p>
         </div>
         <div class="cam-ctl">
-          <button id="cam-start" class="btn accent">Start Hexra</button>
           <button id="cam-toggle" class="btn" hidden>Pause</button>
-          <label class="switch-row cam-try"><input type="checkbox" id="cam-dry"> Try it: show poses, never move the mouse</label>
+          <button id="cam-stop" class="btn" hidden>Stop</button>
           <span class="cam-hint"><span class="dot"></span> On your device · closing this window keeps Hexra in the tray</span>
         </div>
       </div></div>

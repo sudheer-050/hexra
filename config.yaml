@@ -37,6 +37,9 @@ cursor_point: knuckles
 click_lookback_s: 0.15
 click_snap_px: 100
 
+# Recognise poses from the examples of YOUR hand recorded in the first-run calibration (Calibrate tab). Off: the standard rules.
+use_calibration: true
+
 # Start the camera and hand control as soon as Hexra starts (for example at login). Off: Hexra waits until you press Start.
 start_control: false
 

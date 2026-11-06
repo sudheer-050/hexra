@@ -34,7 +34,8 @@ def part3():
                 ["23", "Two cameras, fused", "196"],
                 ["24", "Runs in the system tray", "199"],
                 ["25", "Start with Windows", "202"],
-                ["26", "Redesign: the Cockpit", "202"]], [18, 120, 27])
+                ["26", "Redesign: the Cockpit", "202"],
+                ["27", "First-run hand calibration", "216"]], [18, 120, 27])
 
     s += phase("Phase 0: the starting point - gesture-mouse",
                "You shared a conversation and asked to read the project folder and complete its setup. After it was closed: 'tell me what to run'. "
@@ -235,6 +236,15 @@ def part3():
                "Three directions were compared (Cockpit, Calm, Board) and you chose the Cockpit: a dark window with the tabs along the top, the camera as a large stage on the left with the status on it (Controlling, pose, fps, fused), "
                "and the settings as an inspector on the right. Nothing was removed: every page, setting, preset, the tray and start-with-Windows are the same.",
                "202 tests; only the look changed (index.html, app.css and the tab labels in app.js). Checked in screenshots of the real app on the Overview, Cursor and Camera pages.")
+    s += phase("Phase 27: calibrate to your own hand",
+               "'It is confusing: I made a fist and it thought I was giving thumbs-up, and the other way round.' -> a pose check with your hand -> 'It did not work properly, make this calibration when they first install.'",
+               "A pose check on your real hand showed your fist rests with the thumb tucked against the index finger, which the rules call a pinch (a click); a thumbs-up turned a little looks like a fist. The rules are written for an average hand.",
+               "The first time Hexra opens it walks you through nine poses (open palm, fist, thumbs-up, thumbs-down, pinch, one, two and three fingers, L): a 3-second get-ready and a 6-second hold each, asking you to turn your hand a little. "
+               "handfeat.py describes each frame as 19 size-independent numbers (finger straightness and reach, many thumb measures including 3D). personal.py classifies by the nearest of YOUR recorded examples (numpy, no extra library), "
+               "falls back to the rules for anything unfamiliar, smooths over 3 frames, and cross-validates on blocks of its own recording so it can tell you which poses your hand makes look alike. "
+               "The first moments of each hold and stray frames are discarded; a pose with no hand is asked again, twice, then skipped. The result is saved to data/calibration.npz and used from then on (switch: Use my hand calibration). "
+               "Also fixed on the way: a refused request could reset the connection (the unread request body), which caused an occasional failing test.",
+               "216 tests (14 new) with synthetic hands: each pose separates when turned 20 degrees; a fist whose thumb touches the index is a fist for this hand though the rules call it a click; look-alike poses are reported. The walk-through itself still needs you at the camera.")
 
     s += [PageBreak(), P("13. The other projects on your PC", H1)]
     s += table([["Folder", "What it is", "Status"],
@@ -259,7 +269,7 @@ def part3():
             "<b>Unsigned installer.</b> Windows SmartScreen and some antivirus programs will warn."])
 
     s += [P("15. Tests", H1)]
-    s += [P("202 automated tests, run with <font face='Courier'>.venv\\Scripts\\python -m pytest</font>. They need no camera: the controller, the recogniser and the "
+    s += [P("216 automated tests, run with <font face='Courier'>.venv\\Scripts\\python -m pytest</font>. They need no camera: the controller, the recogniser and the "
             "filters take plain numbers.")]
     s += table([["File", "Tests", "What it checks"],
                 ["test_control.py", "32", "debounce; moving poses start within 2 frames and clicks need the full hold; drag survives flicker and short dropout, ends after sustained release or long loss; "

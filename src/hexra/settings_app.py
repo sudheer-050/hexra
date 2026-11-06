@@ -49,10 +49,10 @@ def tail(path: Path, lines: int = 80) -> str:
         return ""
 
 
-def engine_command(base: Path, dry: bool):
+def engine_command(base: Path, dry: bool, calibrate: bool = False):
     """The command line of the control engine for this install (the installed exe, or the source tree)."""
     exe = base / "Hexra.exe"
-    args = ["--embed", "--engage", "--parent", str(os.getpid())] + (["--dry-run"] if dry else [])
+    args = ["--embed", "--engage", "--parent", str(os.getpid())] + (["--dry-run"] if dry else []) + (["--calibrate"] if calibrate else [])
     if getattr(sys, "frozen", False) or exe.exists():
         return [str(exe)] + args
     return [sys.executable, "-m", "hexra", "--rule"] + args
@@ -80,6 +80,7 @@ class Engine:
         self.base = base
         self.proc: subprocess.Popen | None = None
         self.dry = False
+        self.calibrate = False
         self.started = 0.0
         self.lock = threading.Lock()
 
@@ -87,15 +88,16 @@ class Engine:
     def running(self) -> bool:
         return self.proc is not None and self.proc.poll() is None
 
-    def start(self, dry: bool) -> None:
+    def start(self, dry: bool, calibrate: bool = False) -> None:
         with self.lock:
             if self.running:
                 raise RuntimeError("Hexra is already running")
             (self.base / "data").mkdir(exist_ok=True)
             ipc.clear_all(self.base / "data")
-            self.proc = subprocess.Popen(engine_command(self.base, dry), cwd=str(self.base), stdin=subprocess.DEVNULL,
+            cmd = engine_command(self.base, dry, True) if calibrate else engine_command(self.base, dry)
+            self.proc = subprocess.Popen(cmd, cwd=str(self.base), stdin=subprocess.DEVNULL,
                                          creationflags=CREATE_NO_WINDOW if os.name == "nt" else 0)
-            self.dry, self.started = dry, time.time()
+            self.dry, self.calibrate, self.started = dry, calibrate, time.time()
 
     def toggle(self) -> None:
         if self.running:
@@ -123,7 +125,7 @@ class Engine:
             return {"running": False, "exit_code": code, "error": tail(self.base / "data" / "last_error.log", 4) if code else ""}
         st = ipc.read_status(self.base / "data", max_age_s=3.0)
         warming = not st and time.time() - self.started < 20
-        return {"running": True, "starting": warming, "dry": self.dry, **st}
+        return {"running": True, "starting": warming, "dry": self.dry, "calibrating": self.calibrate, **st}
 
 
 class State:
@@ -158,12 +160,21 @@ class State:
             tip = "Hexra: controlling" if st.get("engaged") else "Hexra: paused"
         return {"running": st.get("running"), "engaged": st.get("engaged"), "dry": st.get("dry"), "tip": tip}
 
+    def calibration_info(self) -> dict:
+        report = None
+        try:
+            report = json.loads((self.base / "data" / "calibration_report.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
+        return {"exists": (self.base / "data" / "calibration.npz").exists(), "report": report}
+
     def snapshot(self) -> dict:
         values = config_io.read_values(self.config)
         return {"schema": schema.schema_json(), "values": values, "defaults": schema.defaults(), "version": version(),
                 "face_models": (self.base / "models" / "face_recognition_sface_2021dec.onnx").exists(),
                 "paths": {"config": str(self.config), "log": str(self.base / "data" / "last_run.log")},
                 "autostart": {"available": autostart.available() and (self.base / "Hexra.exe").exists(), "enabled": autostart.is_enabled()},
+                "calibration": self.calibration_info(),
                 "engine": self.engine.status()}
 
 
@@ -261,6 +272,13 @@ def make_handler(state: State):
 
         def do_POST(self):
             url = urlparse(self.path)
+            try:                                                   # read the request body FIRST, even for a refused request: leaving it unread
+                n = int(self.headers.get("Content-Length", "0") or 0)   # on a keep-alive connection makes Windows reset it under the reply
+            except ValueError:
+                n = 0
+            raw = self.rfile.read(min(n, 200_000)) if n > 0 else b""
+            if n > 200_000:
+                self.close_connection = True
             if url.path == "/api/closing":                         # sendBeacon cannot set headers, so the token rides in the address
                 if self._host_ok() and secrets.compare_digest(parse_qs(url.query).get("t", [""])[0], state.token):
                     state.closing_at = time.time()
@@ -270,8 +288,7 @@ def make_handler(state: State):
                 return self._json({"error": "not allowed"}, 403)
             state.last_seen = time.time()
             try:
-                n = int(self.headers.get("Content-Length", "0"))
-                body = json.loads(self.rfile.read(min(n, 200_000)) or b"{}")
+                body = json.loads(raw or b"{}")
             except (ValueError, json.JSONDecodeError):
                 return self._json({"error": "bad request"}, 400)
             path = urlparse(self.path).path
@@ -294,6 +311,19 @@ def make_handler(state: State):
                         return self._json({"error": "Another Hexra is already running outside this window. Close it first (it would fight over the camera and mouse)."}, 409)
                     state.engine.start(dry)
                     return self._json({"ok": True})
+                if path == "/api/calibrate/start":
+                    state.engine.stop()
+                    if outside_engines(state.base):
+                        return self._json({"error": "Another Hexra is already running outside this window. Close it first."}, 409)
+                    state.engine.start(True, calibrate=True)
+                    return self._json({"ok": True})
+                if path == "/api/calibrate/reset":
+                    for name in ("calibration.npz", "calibration_report.json"):
+                        try:
+                            (state.base / "data" / name).unlink()
+                        except OSError:
+                            pass
+                    return self._json({"ok": True, "calibration": state.calibration_info()})
                 if path == "/api/engine/stop":
                     state.engine.stop()
                     return self._json({"ok": True})
