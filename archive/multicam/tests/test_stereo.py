@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import pytest
 
-from gesture_control.stereo import (CameraModel, board_points, calibrate_rig, fuse_hand, load_calibration, rebase,
+from hexra.stereo import (CameraModel, board_points, calibrate_rig, fuse_hand, load_calibration, rebase,
                                     rebase_volume, save_calibration, triangulate_nview, volume_contains,
                                     volume_from_points)
 
@@ -178,7 +178,7 @@ def test_volume_ignores_outliers_and_gates():
 
 
 def test_3d_pinch_is_not_fooled_by_foreshortening():
-    from gesture_control.poses import RuleRecognizer
+    from hexra.poses import RuleRecognizer
 
     pts = np.zeros((21, 3))
     pts[9] = [0, -5.0, 0]                       # palm length 5
@@ -192,7 +192,7 @@ def test_3d_pinch_is_not_fooled_by_foreshortening():
 
 
 def test_detect_views_keeps_only_the_majority_hand():
-    from gesture_control.stereo import detect_views, mirror_landmarks
+    from hexra.stereo import detect_views, mirror_landmarks
 
     class T:
         def __init__(self, det):
@@ -212,8 +212,8 @@ def test_detect_views_keeps_only_the_majority_hand():
 def test_board_image_has_the_expected_inner_corners(tmp_path):
     import cv2
 
-    from gesture_control.stereo import find_board
-    from gesture_control.stereo_calibrate import make_board_png
+    from hexra.stereo import find_board
+    from hexra.stereo_calibrate import make_board_png
 
     path = str(tmp_path / "b.png")
     make_board_png(path, 9, 6)

@@ -2,8 +2,8 @@
 import cv2
 import numpy as np
 
-from gesture_control.autocal import K_for
-from gesture_control.stereo import CameraModel
+from hexra.autocal import K_for
+from hexra.stereo import CameraModel
 
 W, H = 640, 480
 TRUE_SCALE = 0.85          # the simulated cameras' real focal length / image width

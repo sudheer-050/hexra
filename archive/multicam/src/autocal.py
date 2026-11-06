@@ -4,10 +4,10 @@ While you wave a hand in view of 2+ cameras, the matching finger points seen by 
 poses (essential matrix). A human hand's bones keep the same length, which lets us pick the camera focal length (the
 one that makes bone lengths most constant in 3D) and the real-world scale (your palm length, default 9.5 cm).
 
-Less accurate than the checkerboard route (python -m gesture_control.stereo_calibrate), but fully automatic.
+Less accurate than the checkerboard route (python -m hexra.stereo_calibrate), but fully automatic.
 Only landmark numbers are used; no images are stored.
 
-    python -m gesture_control.autocal                 # run it by hand (also happens automatically on first start)
+    python -m hexra.autocal                 # run it by hand (also happens automatically on first start)
 """
 from __future__ import annotations
 

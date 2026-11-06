@@ -1,6 +1,6 @@
 import numpy as np
 
-from gesture_control.cameras import MultiCamera, scan_cameras
+from hexra.cameras import MultiCamera, scan_cameras
 
 
 class FakeCap:

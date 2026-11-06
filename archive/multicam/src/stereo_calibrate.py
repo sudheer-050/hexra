@@ -1,8 +1,8 @@
 """One-time stereo setup for 2 or more cameras.
 
-    python -m gesture_control.stereo_calibrate --make-board     # writes data/checkerboard_9x6.png to print
-    python -m gesture_control.stereo_calibrate --square-cm 2.5  # calibrate (measure one printed square in cm!)
-    python -m gesture_control.stereo_calibrate --volume-only    # redo just the 3D "air zone"
+    python -m hexra.stereo_calibrate --make-board     # writes data/checkerboard_9x6.png to print
+    python -m hexra.stereo_calibrate --square-cm 2.5  # calibrate (measure one printed square in cm!)
+    python -m hexra.stereo_calibrate --volume-only    # redo just the 3D "air zone"
 
 Step 1 (cameras): hold the printed checkerboard where the cameras can see it, flat and still-ish, and move it
 around: closer/farther, tilted, left/right. It captures views by itself (ESC to finish early).
@@ -124,7 +124,7 @@ def main() -> None:
         path = f"data/checkerboard_{args.cols}x{args.rows}.png"
         make_board_png(path, args.cols, args.rows)
         print(f"Wrote {path}. Print it at 100% scale (no 'fit to page'), glue it flat, and MEASURE one square with a ruler.")
-        print(f"Then run: python -m gesture_control.stereo_calibrate --square-cm <that measurement>")
+        print(f"Then run: python -m hexra.stereo_calibrate --square-cm <that measurement>")
         return
 
     indices = [int(x) for x in args.cameras.split(",")] if args.cameras else [c["index"] for c in scan_cameras()]
@@ -178,7 +178,7 @@ def main() -> None:
             print(f"Only {len(pts)} 3D hand samples (need 30+): no air zone saved. The normal 2D air gate will be used. "
                   "Make sure your hand is visible to 2+ cameras and run again with --volume-only.")
         save_calibration(args.out, models, ref, board, volume)
-        print(f"\nSaved {args.out}. Run the app normally: python -m gesture_control --rule")
+        print(f"\nSaved {args.out}. Run the app normally: python -m hexra --rule")
     finally:
         mc.release()
         cv2.destroyAllWindows()

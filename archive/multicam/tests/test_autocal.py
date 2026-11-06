@@ -3,8 +3,8 @@ import numpy as np
 import pytest
 from hand_sim import H, W, make_rig, simulate_samples
 
-from gesture_control.autocal import (HandSampler, bone_cv, calibrate_from_hands, quality_problem, triangulate_frames)
-from gesture_control.stereo import volume_contains
+from hexra.autocal import (HandSampler, bone_cv, calibrate_from_hands, quality_problem, triangulate_frames)
+from hexra.stereo import volume_contains
 
 
 def rot_err_deg(a, b):
@@ -99,7 +99,7 @@ def test_sampler_skips_near_duplicate_frames_and_needs_two_cameras():
 
 
 def test_finish_picks_the_camera_that_saw_the_hand_most_and_explains_failures(tmp_path):
-    from gesture_control.autocal import _finish
+    from hexra.autocal import _finish
 
     rng = np.random.default_rng(11)
     models = make_rig(2, 18)
