@@ -73,7 +73,6 @@ class RuleRecognizer:
     # far below the wrist for thumbs-down.
     THUMB_UP_CLEAR, THUMB_UP_CLEAR_STAY = 1.30, 1.15
     THUMB_DOWN_CLEAR, THUMB_DOWN_CLEAR_STAY = -0.10, 0.0
-    THUMB_NEAR_VERTICAL = 0.84  # a straight thumb within about 40 degrees of vertical is "rising": the fist is not a grab yet
     ELL_ANGLE = (75.0, 125.0)  # the angle between thumb and index finger for an "L": clearly sideways, not just a thumb held out
     THUMB_BONE_MIN = 0.04      # a thumb whose joints coincide has no usable direction (tracking dropout): ignored
 
@@ -103,9 +102,7 @@ class RuleRecognizer:
         elif self._pinched:
             pose = "click"
         elif fist_like:
-            # A fist whose thumb is straight and pointing up or down is on its way to (or from) a thumbs-up / thumbs-down:
-            # it must not start a window grab. "thumb_fist" is neutral: it does nothing.
-            pose = "thumb_fist" if self._thumb_rising(pts, size) else "fist"
+            pose = "fist"                    # whatever the thumb does: the controller only grabs a window once the hand MOVES
         else:
             if all(ext.values()):
                 pose = "palm"
@@ -156,10 +153,6 @@ class RuleRecognizer:
             return False, vec
         straight = _straightness(pts, (1, 2, 3, 4))
         return straight >= self.THUMB_STRAIGHT and float(np.linalg.norm(vec)) / size >= self.THUMB_LENGTH, vec
-
-    def _thumb_rising(self, pts, size) -> bool:
-        out, vec = self._thumb_state(pts, size)
-        return out and abs(vec[0]) <= self.THUMB_NEAR_VERTICAL * abs(vec[1])
 
     def predict_features(self, feats) -> str:
         return self.predict_points(np.asarray(feats, dtype=np.float32).reshape(21, 3))

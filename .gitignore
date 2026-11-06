@@ -17,3 +17,5 @@ packaging/*.exe
 packaging/*.pdf
 *.exe
 archive/multicam/data/stereo_calibration.json
+# the C compiler and PyInstaller source used to rebuild the bootloader (hundreds of MB; see packaging/build_bootloader.ps1)
+packaging/toolchain/

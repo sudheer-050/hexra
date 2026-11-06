@@ -52,7 +52,7 @@ def test_a_thumb_resting_along_the_fist_is_not_a_thumbs_up():
     """A straight, upright thumb that stays within the fist (its tip at about knuckle height) is just a fist: it must not maximise."""
     pose = RuleRecognizer().predict_points(hand(THUMB_RESTING_UP))
     assert pose != "thumb_up" and pose != "thumb_down"
-    assert pose == "thumb_fist"                          # neutral: it does nothing, and it is no grab either
+    assert pose == "fist"                                # an ordinary fist (it grabs only once the hand moves, and never maximises)
     assert RuleRecognizer().predict_points(hand(THUMB_UP)) == "thumb_up"   # while a thumb that sticks out beyond the fist is
 
 
@@ -65,12 +65,12 @@ def test_the_recogniser_reports_a_thumbs_pose_even_right_after_a_fist():
     assert r.predict_points(hand(THUMB_DOWN)) == "thumb_down"
 
 
-def test_a_fist_with_a_rising_thumb_is_neutral_not_a_grab():
-    """A fist whose thumb is straight and pointing up/down (but not yet a clean thumbs pose) must not start a window grab."""
-    tilted = rotated(hand(THUMB_UP), 36)                 # a little past the thumbs-up tolerance, still clearly rising
-    assert RuleRecognizer().predict_points(tilted) == "thumb_fist"
-    assert RuleRecognizer().predict_points(rotated(hand(THUMB_DOWN), 36)) == "thumb_fist"
-    for thumb in (THUMB_TUCKED, THUMB_SIDE, THUMB_DIAG):  # a tucked, sideways or diagonal thumb is still an ordinary fist
+def test_a_fist_stays_a_fist_whatever_the_thumb_does_unless_it_is_a_clear_thumbs_pose():
+    """Your own fist may well have a straight, upright thumb. It must still be a fist (it grabs once the hand moves)."""
+    for deg in (0, 20, 36, 50):
+        assert RuleRecognizer().predict_points(rotated(hand(THUMB_RESTING_UP), deg)) == "fist", deg
+    assert RuleRecognizer().predict_points(rotated(hand(THUMB_UP), 36)) == "fist"      # sticking out but tilted too far: still no command
+    for thumb in (THUMB_TUCKED, THUMB_SIDE, THUMB_DIAG):
         assert RuleRecognizer().predict_points(hand(thumb)) == "fist"
 
 
@@ -84,7 +84,7 @@ def test_thumbs_up_does_not_flicker_once_held():
     r = RuleRecognizer()
     assert r.predict_points(hand(THUMB_UP)) == "thumb_up"
     assert r.predict_points(rotated(hand(THUMB_UP), 33)) == "thumb_up"           # looser while already held
-    assert RuleRecognizer().predict_points(rotated(hand(THUMB_UP), 33)) == "thumb_fist"  # ...but it would not START there (and is no grab either)
+    assert RuleRecognizer().predict_points(rotated(hand(THUMB_UP), 33)) == "fist"  # ...but it would not START there
 
 
 # ---------------------------------------------------------------- the controller

@@ -25,7 +25,9 @@ def part3():
                 ["14", "Choosing a name; the product becomes Hexra", "83"],
                 ["15", "Window commands built: thumbs-up/down, L close, edge snap; the wave logo and window icons", "111"],
                 ["16", "Accidental fist grabs fixed; no terminal window", "118"],
-                ["17", "A fist no longer maximises: stricter thumbs-up, snap only when dragged into an edge", "121"]], [18, 120, 27])
+                ["17", "A fist no longer maximises: stricter thumbs-up, snap only when dragged into an edge", "121"],
+                ["18", "Antivirus false positive: bootloader rebuilt from source", "121"],
+                ["19", "My fist did not grab: the neutral thumb_fist guard removed", "121"]], [18, 120, 27])
 
     s += phase("Phase 0: the starting point - gesture-mouse",
                "You shared a conversation and asked to read the project folder and complete its setup. After it was closed: 'tell me what to run'. "
@@ -158,6 +160,22 @@ def part3():
                "Log lines now say what fired: the pose in brackets for a command, '[snap top]' for a snap, and 'snapped to the top (maximised)'.",
                "121 tests (3 new). Simulation, 300 samples each: a fist with a thumb resting along it was read as a thumbs-up 0% of the time; real thumbs-ups caught 100% facing the camera, 79% turned 20 degrees. "
                "Not tested on your real hand: this is a fix for two likely causes, not a confirmed diagnosis.")
+    s += phase("Phase 18: Windows Security removes Hexra.exe",
+               "Windows Security twice removed the installed Hexra.exe (and its shortcuts) as Trojan:Win32/Bearfoos.A!ml. You asked: 'rebuild the launcher from source'.",
+               "!ml is a machine-learning guess, typical for new unsigned programs built with PyInstaller. Every PyInstaller program carries the same stock bootloader, a small launcher that many antivirus engines treat with suspicion. "
+               "It was not caught by a scan on install, but about five minutes after the program first ran (the cloud check), once at the first run and once mid-session. Nothing was found wrong with the program itself.",
+               "Your PC had no C compiler, so with your approval I downloaded w64devkit (a portable MinGW-w64 gcc 16.2, 65.6 MB from github.com/skeeto/w64devkit, checked against the sha256 GitHub publishes) and PyInstaller's own source (4.2 MB from PyPI, hash checked), "
+               "built the 64-bit bootloader (run, runw and their debug versions) and installed it into the build environment, keeping the originals. The new bootloader is a different binary (192 KB against 307 KB). "
+               "The steps are in packaging/build_bootloader.ps1; the compiler is in packaging/toolchain, which is not in git.",
+               "The rebuilt program was tested in a temporary copy (self-test, one window, no console). Whether Windows Security accepts it is only known after real use: this is a common mitigation, not a guarantee. See the results in the release notes.")
+    s += phase("Phase 19: 'why is my application not working'",
+               "'Why is my application not working', right after installing 1.1.4.",
+               "Two things. (1) The running copy had been started with --dry-run, which is the 'try it, mouse untouched' shortcut: in that mode Hexra shows poses but never moves the mouse or a window. "
+               "(2) The log showed 'pose changed to thumb_fist' again and again: the guard added in phase 16 made any fist whose thumb was straight and fairly upright a neutral pose, and this user's ordinary fist is exactly that, so it could not grab a window. "
+               "In simulation about 8% of fists at a heavy turn were affected; on a real hand it was far more. I had flagged it as a risk and it was real.",
+               "The guard is removed: a fist is a fist whatever its thumb does. Accidental grabs are still prevented by the deferred grab (a fist only takes hold of a window once the hand moves 30 pixels) and by the guard after thumbs poses; "
+               "a thumbs-up still has to stick out beyond the fist. The installer exe is now also built with the custom bootloader.",
+               "121 tests (the thumb_fist tests rewritten to expect an ordinary fist).")
 
     s += [PageBreak(), P("13. The other projects on your PC", H1)]
     s += table([["Folder", "What it is", "Status"],
@@ -216,6 +234,8 @@ def part3():
                 ["installer.py", "the wizard: folder choice, shortcuts, progress bar; silent mode /S /DIR= /NOSHORTCUTS; writes the uninstall entry in HKCU; keeps an existing config.yaml"],
                 ["make_icons.py", "builds the logo files and app.ico from the master image assets/logo-original.png"],
                 ["pdf_lib.py, content_*.py, make_pdf.py", "this document"],
+                ["build_bootloader.ps1", "rebuilds PyInstaller's bootloader (the small launcher inside Hexra.exe) from source with a portable MinGW-w64 gcc (w64devkit, checked against GitHub's published sha256) and installs it into packaging/buildenv. "
+                 "The compiler (about 700 MB) lives in packaging/toolchain, which is not in git"],
                 ["build_all.ps1", "runs: build app, stage models and config, make the PDF, zip the payload, build the single-file installer"]], [48, 117])
     s += [P("Rebuild", H3), code("cd <the project folder>\npowershell -ExecutionPolicy Bypass -File packaging\\build_all.ps1"),
           P("Result: <font face='Courier'>packaging\\Hexra-Setup.exe</font> and <font face='Courier'>packaging\\Hexra-Guide.pdf</font>.")]

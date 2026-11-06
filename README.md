@@ -147,7 +147,7 @@ The hand model downloads on first run. If the optional face lock is on, the firs
 
 Other tools: `python -m hexra.precision` (measure how steady the cursor point is on your camera), `python -m hexra.calibrate` + `train` (record your own poses and train a personal classifier), `python -m hexra.enroll_face` (face lock).
 
-**Build the installer yourself:** `powershell -ExecutionPolicy Bypass -File packaging\build_all.ps1` (see [`packaging/`](packaging)).
+**Build the installer yourself:** `powershell -ExecutionPolicy Bypass -File packaging\build_all.ps1` (see [`packaging/`](packaging)). The released installers use a PyInstaller bootloader compiled from source ([`packaging/build_bootloader.ps1`](packaging/build_bootloader.ps1)), because the stock one is sometimes flagged by antivirus software.
 
 ---
 

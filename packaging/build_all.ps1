@@ -26,7 +26,7 @@ if (Test-Path "$pk\payload.zip") { Remove-Item "$pk\payload.zip" }
 & $py -c "import shutil; shutil.make_archive(r'$pk\payload', 'zip', r'$stage')"
 $zip = (Resolve-Path "$pk\payload.zip").Path
 $icon = (Resolve-Path "$pk\app.ico").Path
-& $py -m PyInstaller --noconfirm --clean --onefile --windowed --name Hexra-Setup --icon $icon `
+& "$pk\buildenv\Scripts\python.exe" -m PyInstaller --noconfirm --clean --onefile --windowed --name Hexra-Setup --icon $icon `
   --distpath $pk --workpath "$pk\build_setup" --specpath $pk --add-data "${zip};." --add-data "${icon};." `
   --exclude-module numpy --exclude-module cv2 --exclude-module mediapipe --exclude-module matplotlib --exclude-module PIL `
   "$pk\installer.py"
