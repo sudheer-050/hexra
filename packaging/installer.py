@@ -16,7 +16,7 @@ import threading
 import zipfile
 from pathlib import Path
 
-APP, VERSION = "Hexra", "1.2.0"
+APP, VERSION = "Hexra", "1.5.0"
 UNINSTALL_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Hexra"
 KEEP_IF_EXISTS = {"config.yaml"}           # the user's own settings are never overwritten by a re-install
 NO_WINDOW = 0x08000000
@@ -89,8 +89,9 @@ def shortcuts(target: Path, desktop: bool, start_menu: bool) -> None:
     exe = target / "Hexra.exe"
     if start_menu:
         sm = Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Hexra"
-        make_shortcut(sm / "Hexra.lnk", exe, cwd=target, description="Control your screen with hand gestures")
-        make_shortcut(sm / "Hexra (try it, mouse untouched).lnk", exe, "--dry-run", target)
+        make_shortcut(sm / "Hexra.lnk", exe, cwd=target, description="Hexra: settings, live camera and hand control in one window")
+        for old in ("Hexra Settings.lnk", "Hexra (try it, mouse untouched).lnk"):     # earlier versions had separate shortcuts; it is one application now
+            (sm / old).unlink(missing_ok=True)
         if (target / "User Guide.pdf").exists():
             make_shortcut(sm / "User Guide.lnk", target / "User Guide.pdf", cwd=target)
         make_shortcut(sm / "Uninstall Hexra.lnk", exe, "uninstall", target)

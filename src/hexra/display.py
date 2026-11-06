@@ -64,3 +64,52 @@ class Display:
             self._stop = True
             self._cond.notify()
         self._thread.join(timeout=1.0)
+
+
+class FilePreview:
+    """Same interface as Display, but instead of a window it writes the newest picture to data/preview.jpg for the settings window.
+
+    JPEG encoding happens on this thread, never in the control loop, and at most ~20 pictures a second are written.
+    """
+
+    def __init__(self, base, quality: int = 72, max_fps: float = 20.0):
+        from . import ipc
+
+        self._ipc, self._path = ipc, base / ipc.PREVIEW
+        self._quality, self._gap = quality, 1.0 / max_fps
+        self._cond = threading.Condition()
+        self._frame = None
+        self._stop = False
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def show(self, frame) -> None:
+        with self._cond:
+            self._frame = frame
+            self._cond.notify()
+
+    def keys(self) -> list:
+        return []
+
+    def _run(self) -> None:
+        import time
+
+        last = 0.0
+        while True:
+            with self._cond:
+                self._cond.wait_for(lambda: self._frame is not None or self._stop, 0.2)
+                if self._stop:
+                    break
+                frame, self._frame = self._frame, None
+            if frame is None or time.monotonic() - last < self._gap:
+                continue
+            ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, self._quality])
+            if ok:
+                self._ipc.write_atomic(self._path, buf.tobytes())
+                last = time.monotonic()
+
+    def close(self) -> None:
+        with self._cond:
+            self._stop = True
+            self._cond.notify()
+        self._thread.join(timeout=1.0)

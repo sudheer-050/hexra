@@ -28,7 +28,7 @@
 [![Release](https://img.shields.io/github/v/release/sudheer-050/hexra?color=blue&logo=github&logoColor=white)](https://github.com/sudheer-050/hexra/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078d4?logo=windows&logoColor=white)]()
-[![Tests](https://img.shields.io/badge/tests-139%20passed%20(100%25)-brightgreen.svg?logo=pytest&logoColor=white)]()
+[![Tests](https://img.shields.io/badge/tests-202%20passed%20(100%25)-brightgreen.svg?logo=pytest&logoColor=white)]()
 [![Tracking](https://img.shields.io/badge/hand%20tracking-MediaPipe-orange.svg)](https://developers.google.com/mediapipe)
 [![Privacy](https://img.shields.io/badge/privacy-100%25%20local%20%7C%20no%20cloud-success.svg)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
@@ -93,7 +93,7 @@ Safety: they never act on the desktop, the taskbar or Hexra's own windows; they 
 * **In-the-air only:** a hand resting on a desk, your lap or your head is ignored. It starts asleep and wakes with a 1-second open palm.
 * **Stable holds:** a click-drag or a grabbed window survives pose flicker, motion blur and brief tracking loss.
 * **Optional admin face lock:** gestures only work while your enrolled face is recognised (in the source; off in the installer build).
-* **Tested without a camera:** the state machine has no camera or OS calls inside, so all 139 tests run anywhere.
+* **Tested without a camera:** the state machine has no camera or OS calls inside, so all 202 tests run anywhere.
 
 ### ❌ What It Does NOT Do
 
@@ -141,7 +141,7 @@ python -m venv .venv
 
 .venv\Scripts\python -m hexra --dry-run --rule   # try it, mouse untouched
 .venv\Scripts\python -m hexra --rule             # real control: F8 engage, F9 quit
-.venv\Scripts\python -m pytest                             # 139 tests, no camera needed
+.venv\Scripts\python -m pytest                             # 202 tests, no camera needed
 ```
 
 The hand model downloads on first run. If the optional face lock is on, the first start asks before downloading two small face models and then enrols you.
@@ -154,7 +154,15 @@ Other tools: `python -m hexra.precision` (measure how steady the cursor point is
 
 ## 🎛️ Settings
 
-Everything lives in [`config.yaml`](config.yaml), commented line by line. A few favourites:
+**Two cameras (optional):** choose two on the Camera page and both track your hand; the one with the better view decides the pose and both steady the cursor, and if one loses your hand the other carries on. Face-direction pausing is off with two cameras. It was tested with simulated cameras, not yet with two real ones.
+
+**Start with Windows:** switch it on from the Overview page and Hexra starts quietly in the tray at login (a second option also starts the camera and control).
+
+**Runs in the tray:** closing the window leaves Hexra running in the system tray (bottom right; it may be under the ^ arrow). Click the icon to bring the window back; right-click it for Pause, Stop and Quit. Quit in the tray is the only way to close it.
+
+**One window:** open **Hexra** from the Start Menu. The live camera view, Start / Stop and Pause are in the sidebar, and every setting is on the pages beside it. Every setting is there with a plain explanation and the delay it adds (for example "Smooth: about 59 ms"), presets, search, and Save. It edits `config.yaml` for you and keeps your comments and a backup.
+
+Or edit [`config.yaml`](config.yaml) by hand, commented line by line. A few favourites:
 
 ```yaml
 feel: responsive          # smooth | balanced | responsive
@@ -199,7 +207,7 @@ The full deep dive (every algorithm, every threshold, and every change made from
 
 ## ⚠️ Honest Limits
 
-* Most tuning (rotation, curl, jitter, lag, click drift) was validated on **simulated hands** plus 139 automated tests, not a lab of real users. The real feel depends on your camera, light and hand.
+* Most tuning (rotation, curl, jitter, lag, click drift) was validated on **simulated hands** plus 202 automated tests, not a lab of real users. The real feel depends on your camera, light and hand.
 * A fist turned fully sideways to the camera, or a scroll hand tilted backwards, was not recognised in simulation.
 * The window commands are new and were tuned on simulated hands only. A thumb held out while pointing can look like an L, which is why close needs a 1.5 s hold and shows a ring. In simulation, a frontal hand was read as a command by mistake 0% of the time (at most 2% of frames when heavily turned), and real commands were caught 99 to 100% of the time frontally and roughly 80 to 95% when the hand was turned 20 degrees.
 * One hand is used at a time; one camera (camera 0).

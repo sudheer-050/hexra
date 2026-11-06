@@ -67,3 +67,31 @@ class ThreadedCamera:
         self._stop = True
         time.sleep(0.05)
         self._cap.release()
+
+
+def probe_cameras(max_index: int = 4, thumb=(160, 120)) -> list:
+    """Find the cameras Windows offers (indices 0, 1, 2... stop at the first that does not open) with a small picture of each,
+    so the user can tell which is which. Only call this while Hexra is not using a camera: one that is busy cannot be opened."""
+    import base64
+
+    found = []
+    for i in range(max_index + 1):
+        cap = cv2.VideoCapture(i)
+        if not cap.isOpened():
+            cap.release()
+            break
+        frame = None
+        for _ in range(6):                      # the first frames of a camera that has just opened are often black
+            ok, f = cap.read()
+            if ok:
+                frame = f
+        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+        cap.release()
+        item = {"index": i, "width": w, "height": h, "thumb": ""}
+        if frame is not None:
+            ok, buf = cv2.imencode(".jpg", cv2.resize(frame, thumb), [cv2.IMWRITE_JPEG_QUALITY, 70])
+            if ok:
+                item["thumb"] = "data:image/jpeg;base64," + base64.b64encode(buf.tobytes()).decode()
+        found.append(item)
+    return found

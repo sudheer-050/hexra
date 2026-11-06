@@ -4,9 +4,10 @@
 # Uses packaging\buildenv: a slim environment with mediapipe + plain opencv-python (no contrib, no face recogniser).
 $ErrorActionPreference = "Stop"
 $icon = (Resolve-Path "packaging\app.ico").Path
+$ui = (Resolve-Path "src\hexra\ui").Path   # absolute: PyInstaller resolves relative data paths against the spec folder
 packaging\buildenv\Scripts\python.exe -m PyInstaller --noconfirm --clean --name Hexra --noconsole `
   --paths src --distpath packaging\dist --workpath packaging\build --specpath packaging `
-  --collect-all mediapipe --collect-submodules hexra `
+  --collect-all mediapipe --collect-submodules hexra --add-data "${ui};hexra\ui" `
   --exclude-module sklearn --exclude-module pytest --exclude-module scipy --exclude-module matplotlib --exclude-module PIL `
   --exclude-module pandas --exclude-module IPython `
   --icon $icon packaging\launcher.py

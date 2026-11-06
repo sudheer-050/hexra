@@ -14,7 +14,7 @@ def write(tmp_path, text, bom=False):
 def test_shipped_config_loads():
     cfg = load_config("config.yaml")
     assert (cfg.min_cutoff, cfg.beta, cfg.deadzone_px) == FEEL["responsive"]
-    assert cfg.cursor_mode == "relative" and cfg.camera == {"width": 640, "height": 480}
+    assert cfg.cursor_mode == "relative" and cfg.camera == {"width": 640, "height": 480, "use": [0]}
     assert cfg.actions["fist"] == "move_window"
 
 

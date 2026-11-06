@@ -42,7 +42,7 @@ class HandTracker:
         self._last = -1
 
     def detect(self, frame_bgr, timestamp_ms: int):
-        """Return (landmarks, label) for the best hand, or None."""
+        """Return (landmarks, label, confidence) for the best hand, or None."""
         import cv2
 
         self._last = max(timestamp_ms, self._last + 1)
@@ -51,7 +51,7 @@ class HandTracker:
         res = self._landmarker.detect_for_video(image, self._last)
         if not res.hand_landmarks:
             return None
-        return res.hand_landmarks[0], res.handedness[0][0].category_name
+        return res.hand_landmarks[0], res.handedness[0][0].category_name, float(res.handedness[0][0].score)
 
     def close(self):
         self._landmarker.close()

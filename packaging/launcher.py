@@ -142,6 +142,11 @@ def uninstall() -> int:
         winreg.DeleteKey(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY)
     except OSError:
         pass
+    try:                                               # and the "start with Windows" entry, if it was switched on
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE) as k:
+            winreg.DeleteValue(k, "Hexra")
+    except OSError:
+        pass
     os.chdir(base.parent)
     # A running program cannot delete itself: a detached helper deletes the folder a few seconds after we exit.
     subprocess.Popen(f'cmd /c ping -n 7 127.0.0.1 >nul & rmdir /s /q "{base}"', shell=True,
@@ -156,7 +161,9 @@ def main() -> int:
     os.chdir(base_dir())
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if WINDOWED:
-        if cmd in CONSOLE_COMMANDS or any(a in ("-h", "--help") for a in sys.argv[1:]) or _face_lock_on():
+        if cmd in ("", "settings", "--background"):
+            _quiet_streams()
+        elif cmd in CONSOLE_COMMANDS or any(a in ("-h", "--help") for a in sys.argv[1:]) or _face_lock_on():
             _attach_console()
         else:
             _quiet_streams()
@@ -167,6 +174,8 @@ def main() -> int:
     if cmd == "enroll":
         sys.argv = ["enroll_face"] + sys.argv[2:]
         from hexra.enroll_face import main as run
+    elif cmd in ("", "settings", "--background"):                     # plain "Hexra": the application window (settings + camera + controls)
+        from hexra.settings_app import main as run
     elif cmd == "precision":
         sys.argv = ["precision"] + sys.argv[2:]
         from hexra.precision import main as run

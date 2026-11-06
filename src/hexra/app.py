@@ -18,8 +18,10 @@ from .actions import NullMouse, PynputMouse
 from .attention import build as build_attention
 from .calibrate import draw_hand
 from .camera import ThreadedCamera
+from .multicam import MultiSource
 from .controller import FEEL, Controller, ControllerConfig
-from .display import Display
+from . import ipc
+from .display import Display, FilePreview
 from .face_lock import DEFAULTS as FACE_LOCK_DEFAULTS
 from . import icon
 from .features import normalize
@@ -90,6 +92,9 @@ def main() -> None:
     ap.add_argument("--rule", action="store_true", help="use the rule-based recogniser (no training needed)")
     ap.add_argument("--no-face-lock", action="store_true", help="run without the admin face lock this time")
     ap.add_argument("--config", default="config.yaml")
+    ap.add_argument("--embed", action="store_true", help="run as the engine of the Hexra app: the picture goes to the app window, not a window of its own")
+    ap.add_argument("--engage", action="store_true", help="start with control engaged (the app's Start button)")
+    ap.add_argument("--parent", type=int, default=0, help="quit when this process (the app window) is gone")
     args = ap.parse_args()
     Path("data").mkdir(exist_ok=True)
     logging.basicConfig(level=logging.INFO, format="%(message)s", force=True,
@@ -124,7 +129,11 @@ def main() -> None:
     else:
         log.info("Face lock OFF: anyone can use the gestures.")
 
-    attention = build_attention(cfg.attention)
+    cam_indices = [int(i) for i in (cfg.camera.get("use") or [0])][:2]
+    multi = len(cam_indices) >= 2
+    attention = None if multi else build_attention(cfg.attention)
+    if multi and cfg.attention.get("enabled"):
+        log.info("Two cameras: the face-direction gate is switched off (it needs one camera that faces you).")
     if attention is not None:
         log.info("Attention gate ON: gestures work only while you face the screen (head turned less than %d degrees).",
                  attention.gate.max_turn_deg)
@@ -132,13 +141,29 @@ def main() -> None:
     mouse = NullMouse() if args.dry_run else PynputMouse()
     gate = AirGate(**cfg.air)
     ctl = Controller(cfg, mouse, NullMover() if args.dry_run else make_mover())
-    tracker = HandTracker(ensure_model("models/hand_landmarker.task"))
-    cap = ThreadedCamera(0, int(cfg.camera.get("width", 640)), int(cfg.camera.get("height", 480)))
-    if not cap.opened:
-        raise SystemExit("Could not open the webcam.")
+    cam_w, cam_h = int(cfg.camera.get("width", 640)), int(cfg.camera.get("height", 480))
+    model = ensure_model("models/hand_landmarker.task")
+    msrc = None
+    if multi:
+        caps = [ThreadedCamera(i, cam_w, cam_h) for i in cam_indices]
+        bad = [i for i, c in zip(cam_indices, caps) if not c.opened]
+        if bad:
+            for c in caps:
+                c.release()
+            raise SystemExit(f"Could not open camera {', '.join(str(i) for i in bad)}. Check it is plugged in and not used by another program, "
+                             "or choose different cameras on the Camera page.")
+        msrc = MultiSource([(c, HandTracker(model)) for c in caps])
+        tracker = cap = None
+        log.info("Two cameras (%s): both track your hand; the better view gives the pose and both steady the cursor.",
+                 " + ".join(f"camera {i}" for i in cam_indices))
+    else:
+        tracker = HandTracker(model)
+        cap = ThreadedCamera(cam_indices[0], cam_w, cam_h)
+        if not cap.opened:
+            raise SystemExit("Could not open the webcam.")
 
     engaged, stop = threading.Event(), threading.Event()
-    if args.dry_run:
+    if args.dry_run or args.engage:
         engaged.set()
 
     def toggle():
@@ -146,30 +171,54 @@ def main() -> None:
         log.info("Control %s", "ENGAGED" if engaged.is_set() else "PAUSED")
 
     listener = _start_hotkeys(toggle, stop.set)
-    display = Display("Hexra")      # the preview runs on its own thread: drawing must never delay the cursor
+    base = Path("data").resolve()                       # where the app window and the engine leave each other files (ipc.py)
+    # the preview runs on its own thread: drawing must never delay the cursor
+    display = FilePreview(base) if args.embed else Display("Hexra")
+    if args.embed:
+        ipc.clear_all(base)
     log.info("Ready. %s F9 quits.", "Dry run: mouse is NOT controlled." if args.dry_run else "Press F8 to engage.")
 
-    fps_t, fps, lat_ms = time.monotonic(), 0.0, 0.0
+    fps_t, fps, fps_n, lat_ms = time.monotonic(), 0.0, 0, 0.0
     shown_note, note_until = "", 0.0
     was_away = False
+    next_ctl = next_status = 0.0
     try:
         while not stop.is_set():
-            got = cap.read()
-            if got is None:
-                if not cap.alive:
-                    log.error("Camera stopped delivering frames.")
+            if args.embed and time.monotonic() >= next_ctl:        # the app window's requests, five times a second
+                next_ctl = time.monotonic() + 0.2
+                if ipc.consume(base, ipc.STOP) or (args.parent and not ipc.process_alive(args.parent)):
+                    log.info("Stopped by the Hexra window.")
                     break
-                continue
-            frame, t = got                       # t = the moment the camera captured this frame
-            frame = cv2.flip(frame, 1)
-            det = tracker.detect(frame, int(t * 1000))
+                if ipc.consume(base, ipc.TOGGLE):
+                    toggle()
+            inset, cams_mode = [], ""
+            if multi:
+                step_in = msrc.read()
+                if step_in is None:
+                    if not msrc.alive:
+                        log.error("The cameras stopped delivering frames.")
+                        break
+                    continue
+                frame, t, det, inset, cams_mode = step_in.frame, step_in.t, step_in.det, step_in.inset, step_in.mode
+            else:
+                got = cap.read()
+                if got is None:
+                    if not cap.alive:
+                        log.error("Camera stopped delivering frames.")
+                        break
+                    continue
+                frame, t = got                       # t = the moment the camera captured this frame
+                frame = cv2.flip(frame, 1)
+                det = tracker.detect(frame, int(t * 1000))
             pose, lm = None, None
             if det:
                 lm = det[0]
                 try:
-                    pose = recog.predict_features(normalize(lm, det[1]))
+                    pose = recog.predict_features(normalize(lm, det[1]))     # finger shape: from the camera with the better view
                 except ValueError:
                     pose = None
+                if multi:
+                    lm = det[2]                                              # position: the fused hand, in camera 1's frame
             if lock is not None:
                 lock.submit(frame, t)                     # a background thread checks the picture; this never waits
                 if not lock.allowed(t):
@@ -191,8 +240,10 @@ def main() -> None:
                 ctl.note = ""
             lat_ms = 0.9 * lat_ms + 0.1 * (time.monotonic() - t) * 1000   # capture -> action sent (before drawing)
 
-            fps = 0.9 * fps + 0.1 / max(t - fps_t, 1e-6)
-            fps_t = t
+            fps_n += 1
+            now_m = time.monotonic()
+            if now_m - fps_t >= 1.0:                      # frames counted over a second of real time (camera timestamps can repeat)
+                fps, fps_n, fps_t = fps_n / (now_m - fps_t), 0, now_m
             h, w = frame.shape[:2]
             x0, y0, x1, y1 = cfg.region
             cv2.rectangle(frame, (int(x0 * w), int(y0 * h)), (int(x1 * w), int(y1 * h)), (0, 255, 255), 1)
@@ -235,7 +286,24 @@ def main() -> None:
             status = "ENGAGED" if engaged.is_set() else "PAUSED (F8 or 'e')"
             cv2.putText(frame, f"{status}   pose: {stable or '-'}   [{name}]   {fps:.0f} fps  {lat_ms:.0f} ms", (10, 28),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0) if engaged.is_set() else (0, 0, 255), 2)
+            if inset:                                                   # the other camera, as a small picture in the corner
+                other, other_lm = inset[0]
+                other = other.copy()
+                if other_lm:
+                    draw_hand(other, other_lm)
+                tw = frame.shape[1] // 3
+                th = int(other.shape[0] * tw / other.shape[1])
+                small = cv2.resize(other, (tw, th))
+                cv2.rectangle(small, (0, 0), (tw - 1, th - 1), (255, 255, 255), 1)
+                frame[frame.shape[0] - th - 4:frame.shape[0] - 4, frame.shape[1] - tw - 4:frame.shape[1] - 4] = small
+            if multi:
+                cv2.putText(frame, f"2 cameras: {cams_mode}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
             display.show(frame)
+            if args.embed and time.monotonic() >= next_status:
+                next_status = time.monotonic() + 0.25
+                ipc.write_status(base, engaged=engaged.is_set(), pose=stable or "", fps=round(min(fps, 240)), lat_ms=round(lat_ms), dry=bool(args.dry_run),
+                                 asleep=bool(gate.enabled and not gate.awake), away=looking_away, note=shown_note if time.monotonic() < note_until else "",
+                                 hint=ctl.hint or "", cams=cams_mode)
             quit_now = False
             for key in display.keys():
                 if key == ord("q"):
@@ -251,11 +319,16 @@ def main() -> None:
             lock.close()
         if attention is not None:
             attention.close()
-        cap.release()
-        tracker.close()
+        if multi:
+            msrc.release()
+        else:
+            cap.release()
+            tracker.close()
         cv2.destroyAllWindows()
         if listener:
             listener.stop()
+        if args.embed:
+            ipc.clear_all(base)
 
 
 if __name__ == "__main__":

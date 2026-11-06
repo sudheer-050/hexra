@@ -28,7 +28,12 @@ def part3():
                 ["17", "A fist no longer maximises: stricter thumbs-up, snap only when dragged into an edge", "121"],
                 ["18", "Antivirus false positive: bootloader rebuilt from source", "121"],
                 ["19", "My fist did not grab: the neutral thumb_fist guard removed", "121"],
-                ["20", "Attention gate: only when you face the screen", "139"]], [18, 120, 27])
+                ["20", "Attention gate: only when you face the screen", "139"],
+                ["21", "Settings app: every setting, with its latency", "167"],
+                ["22", "One application: settings, live camera and controls in a single window", "173"],
+                ["23", "Two cameras, fused", "196"],
+                ["24", "Runs in the system tray", "199"],
+                ["25", "Start with Windows", "202"]], [18, 120, 27])
 
     s += phase("Phase 0: the starting point - gesture-mouse",
                "You shared a conversation and asked to read the project folder and complete its setup. After it was closed: 'tell me what to run'. "
@@ -184,6 +189,44 @@ def part3():
                "gestures paused once you have looked more than 35 degrees away (or no face is seen) for more than 1 second, resumed the moment you look back. The camera window shows the live turn and LOOKING AWAY. "
                "Off by default; the detector model ships in the installer; the self-test loads it.",
                "139 tests (18 new), all with a fake detector and no camera. The 0.476 constant is average anatomy, not calibrated on your face: the live number in the camera window is how to tune max_turn_deg. Not tested on your real face yet.")
+    s += phase("Phase 21: a settings app",
+               "'Prepare an application style and let users change settings, like everything, and mention the possible latency for each option... like Notewll has.'",
+               "Every behaviour lived in a commented config.yaml. Fine for me, hard for anyone else, and nothing said what a choice costs in speed.",
+               "Hexra Settings: a local window (Start Menu, or Hexra.exe settings) in the Notewll style. settings_schema.py lists every setting with range, default, explanation and a latency note "
+               "(frames become milliseconds at 30 fps; presets carry measured filter lag; each note says whether it was measured, simulated, calculated or estimated). config_io.py edits config.yaml line by line so comments survive, re-reads the result before writing and keeps config.yaml.bak. "
+               "settings_app.py serves it on 127.0.0.1 only, with a secret token and Host check, and quits when the window closes.",
+               "167 tests (28 new): the catalogue covers every config key, every setting round-trips through the real config and the app loads it, bad input changes nothing, the server refuses requests without the token.")
+    s += phase("Phase 22: one application",
+               "'I want single application: when I press Hexra it should open a single page, the settings place, and the camera that it is showing right now, positioned in the sidebar.'",
+               "Hexra was two things: a settings window and a separate OpenCV camera window, each started its own way.",
+               "Pressing Hexra now opens one window. The camera picture is in the sidebar with Start / Stop, Pause / Resume and a try-it switch; the settings are the pages beside it. "
+               "The control engine still runs as its own process (a camera or tracker problem cannot take the window down); it leaves the newest picture and its status in data\\ (ipc.py) and the window streams the picture as motion-JPEG. "
+               "Saving a setting restarts the engine so it takes effect at once; closing the window stops the engine, so nothing keeps controlling the mouse out of sight.",
+               "173 tests (6 new) with a stand-in engine that speaks the same protocol; the real engine was also run end to end in try-it mode with the real webcam.")
+    s += phase("Phase 23: two cameras again, fused",
+               "'When it has multiple cameras the straight face should be disabled, and both should scan and track my fingers with precision, they should integrate the tracking.' -> "
+               "'I want the fused setup' -> 'which camera has the better view, it should take that input'.",
+               "The first two-camera version (phase 8) tried true stereo 3D and failed on the real cameras: set-up needed both cameras to see the hand at once, then it stopped moving properly.",
+               "No 3D and no set-up step. Each camera runs its own tracker on its own thread; the loop is paced by camera 1 so every frame-count setting keeps its meaning. fusion.py learns an affine map camera 2 -> camera 1 from moments when both see the hand, "
+               "then averages the cursor point weighted by view quality (detector confidence x how much of the hand is inside the picture x how large it is). The pose and finger shape come from the better view only, with hysteresis. "
+               "If a camera loses the hand the other carries on with no jump (an offset keeps the point continuous); if the two views stop agreeing the map is thrown away and relearned. "
+               "The mode (fused, camera 1 only, camera 2 only, learning N%) is shown in the sidebar, so nothing falls back silently. The face-direction gate is switched off with two cameras. The Camera page detects cameras and shows a picture of each.",
+               "196 tests (23 new): learning the map, fused noise lower than a single camera, failover without jumps, the better view, a bumped camera, and the two-camera source with fake cameras. "
+               "NOT yet tried on two real cameras: this machine currently shows one webcam and one infrared webcam, so the real-hardware behaviour is unverified.")
+    s += phase("Phase 24: keep running in the system tray",
+               "'I want this app running in background as well, even if I close this application it should be running in the tray bar; only if they close from the system tray it should close.'",
+               "Closing the window used to end Hexra, because the window was the application.",
+               "Hexra now has a tray icon (tray.py, plain Windows calls, no extra library). Closing the window leaves Hexra, and the engine if it was running, going. Left-click the icon (or start Hexra again, which finds the running copy and just shows its window) to bring the window back; "
+               "right-click for Open, Pause / Resume, Start / Stop and Quit. Quit is the only way to close it: it stops the engine, removes the icon and closes the window. "
+               "If a tray icon cannot be made, closing the window still ends Hexra, so it is never left running with no way to close it.",
+               "199 tests (3 new) really add and remove a tray icon and send it clicks and menu commands. The whole close-the-window / reopen / quit cycle is checked on the installed copy.")
+    s += phase("Phase 25: start with Windows",
+               "'Make it start with Windows.'",
+               "Hexra lived in the tray but still had to be started by hand after every restart.",
+               "A toggle on the Overview page writes one value to the current user's Run key (autostart.py, no administrator rights): Hexra --background, which goes straight to the tray with no window. "
+               "A separate setting, Start hand control automatically (Startup page, off by default), also switches the camera and control on at launch. Uninstalling removes the entry. "
+               "If a tray icon cannot be made the window still opens, so Hexra is never invisible at login.",
+               "202 tests (3 new, using their own registry key, never the real Run key).")
 
     s += [PageBreak(), P("13. The other projects on your PC", H1)]
     s += table([["Folder", "What it is", "Status"],
@@ -208,7 +251,7 @@ def part3():
             "<b>Unsigned installer.</b> Windows SmartScreen and some antivirus programs will warn."])
 
     s += [P("15. Tests", H1)]
-    s += [P("139 automated tests, run with <font face='Courier'>.venv\\Scripts\\python -m pytest</font>. They need no camera: the controller, the recogniser and the "
+    s += [P("202 automated tests, run with <font face='Courier'>.venv\\Scripts\\python -m pytest</font>. They need no camera: the controller, the recogniser and the "
             "filters take plain numbers.")]
     s += table([["File", "Tests", "What it checks"],
                 ["test_control.py", "32", "debounce; moving poses start within 2 frames and clicks need the full hold; drag survives flicker and short dropout, ends after sustained release or long loss; "
