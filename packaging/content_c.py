@@ -23,7 +23,8 @@ def part3():
                 ["10", "Extra screens", "57"], ["11", "Precision, face lock, edge and line fixes", "61 to 78"], ["12", "Rotation and scroll-to-fist bugs", "80 to 83"],
                 ["13", "Window commands discussed; this guide and the installer", "83"],
                 ["14", "Choosing a name; the product becomes Hexra", "83"],
-                ["15", "Window commands built: thumbs-up/down, L close, edge snap; the wave logo and window icons", "111"]], [18, 120, 27])
+                ["15", "Window commands built: thumbs-up/down, L close, edge snap; the wave logo and window icons", "111"],
+                ["16", "Accidental fist grabs fixed; no terminal window", "118"]], [18, 120, 27])
 
     s += phase("Phase 0: the starting point - gesture-mouse",
                "You shared a conversation and asked to read the project folder and complete its setup. After it was closed: 'tell me what to run'. "
@@ -138,6 +139,15 @@ def part3():
                "edge snapping of a fist-dragged window with a live hint; Win32 maximise, minimise, close (WM_CLOSE) and monitor-aware half-screen snapping; config keys and documentation.",
                "109 tests (26 new). Simulation: frontal hand read as a command by mistake 0% of the time; commands caught 99 to 100% frontal, about 79 to 96% turned 20 degrees. "
                "Not done: a test on your real hand, and a live test of the Win32 calls on real windows (only the lookups were smoke-tested).")
+    s += phase("Phase 16: accidental fist grabs, and no terminal window",
+               "After testing the window commands: 18 window grabs started and ended in three minutes while trying thumbs poses. Then: 'it opens terminal and the tab as well, can I make it run just the tab', and 'fix the accidental fist grabs'.",
+               "A thumbs-up is made by closing the fingers into a fist and then raising the thumb, and a fist held for about 0.17 s was a window grab. Worse, a fist stuck (the recogniser never reported the thumb after a fist), "
+               "and a grab had real side effects at once: it un-maximised a maximised window and then followed every wobble of the hand. In a simulation of 200 thumbs-ups the old behaviour started a grab 100% of the time, moved a window 98% of the time and fired the command 0% of the time.",
+               "Three layers. (1) The grab is deferred: a fist only takes hold of a window after the hand has moved 30 pixels, and then follows from where the fist started; a still fist touches nothing. "
+               "(2) The recogniser reports a thumbs pose even right after a fist, a fist with a rising thumb is neutral, and a thumbs pose before any window is held cancels the pending grab, while a window really being dragged is never dropped by a thumb. "
+               "(3) After any thumbs pose a fist cannot grab for 0.6 s. Separately, the installed program is now a windowed program with no terminal; a console opens only for uninstall, selftest, enroll and precision, and problems appear in a message box.",
+               "118 tests (7 new, 3 rewritten). Same simulation after the fix: a grab started in 0.5%, a window moved in 0.5%, the command fired in 83% (limited by simulated holds shorter than 0.5 s). "
+               "The windowed build was checked in a temporary copy: self-test passed, one visible window (the camera window), no console. Not tested on your real hand.")
 
     s += [PageBreak(), P("13. The other projects on your PC", H1)]
     s += table([["Folder", "What it is", "Status"],
@@ -162,7 +172,7 @@ def part3():
             "<b>Unsigned installer.</b> Windows SmartScreen and some antivirus programs will warn."])
 
     s += [P("15. Tests", H1)]
-    s += [P("111 automated tests, run with <font face='Courier'>.venv\\Scripts\\python -m pytest</font>. They need no camera: the controller, the recogniser and the "
+    s += [P("118 automated tests, run with <font face='Courier'>.venv\\Scripts\\python -m pytest</font>. They need no camera: the controller, the recogniser and the "
             "filters take plain numbers.")]
     s += table([["File", "Tests", "What it checks"],
                 ["test_control.py", "32", "debounce; moving poses start within 2 frames and clicks need the full hold; drag survives flicker and short dropout, ends after sustained release or long loss; "
@@ -181,6 +191,8 @@ def part3():
                 ["test_commands.py", "26", "thumbs-up, thumbs-down and L are recognised; an ordinary fist (thumb tucked, to the side or diagonal) never is; pointing is not an L; a thumb out of a held fist is ignored; "
                  "tilt tolerance and no flicker; a command fires once after its hold, again only after leaving the pose; close needs 1.5 s and shows progress; dropping the pose cancels; a flicker keeps progress; "
                  "the cursor does not move during a command; no command while a fist is held; no grab right after a command; remapping works; edge zones, left/right/top snap, corners, live hint, no snap when the hand is lost or snapping is off, snap uses the screen under the cursor"],
+                ["test_commands.py (grab tests)", "6", "a fist that stays still takes hold of nothing; a fist on its way to a thumbs-up is not a grab; a moving fist takes hold and follows from where it started; "
+                 "a window really being dragged is not dropped by a thumb popping out; relaxing out of a thumbs pose does not grab; an ordinary deliberate grab still works"],
                 ["test_icon.py", "2", "the icon file is found; setting the window and taskbar icon never raises, whatever the window or platform"],
                 ["test_config.py", "4", "shipped config loads; a file with a byte-order mark loads; explicit values override the preset; unknown feel is rejected"]], [32, 12, 121])
 

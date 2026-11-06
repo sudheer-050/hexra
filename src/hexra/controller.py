@@ -62,6 +62,8 @@ class ControllerConfig:
     close_hold_s: float = 1.5               # hold the L shape this long to close a window (a ring fills while you hold)
     command_grace_s: float = 0.15           # a command pose may flicker away this long without losing its progress
     command_cooldown_s: float = 0.8         # after a command, a fist cannot grab a window for this long
+    grab_move_px: float = 30.0              # a fist only takes hold of a window once the hand has moved this far (0 = at once)
+    thumb_guard_s: float = 0.6              # after a thumbs pose, a fist cannot grab a window for this long (a hand relaxing)
     snap_edges: bool = True                 # releasing a fist-dragged window at a screen edge snaps it
     snap_edge_px: float = 30.0              # ...when the cursor is within this many pixels of the edge
     scroll_gain: float = 150.0
@@ -96,6 +98,8 @@ class Controller:
         self._cmd_seen = 0.0
         self._cmd_fired = False   # a held command fires once; the pose must be left before it can fire again
         self._block_until = 0.0   # a fist cannot grab a window until this time (just after a command)
+        self._grab_block_until = 0.0   # ...and until this time (just after a thumbs pose was seen, even if it did not fire)
+        self._grab_pending = None  # (x, y) where a fist started, while it has not moved enough yet to take hold of a window
         self.stable = None
         self._cand = None
         self._cand_since = 0.0   # when the current candidate pose first appeared
@@ -135,6 +139,7 @@ class Controller:
         if pose != self._cmd_pose:
             self._cmd_pose, self._cmd_since, self._cmd_fired = pose, t, False
         self._cmd_seen = t
+        self._grab_block_until = max(self._grab_block_until, t + self.cfg.thumb_guard_s)
         if self._cmd_fired:
             return
         label, method = COMMANDS[action]
@@ -152,6 +157,17 @@ class Controller:
         """No command pose this frame. A short flicker keeps the progress; a real change of pose cancels it."""
         if self._cmd_pose is not None and t - self._cmd_seen > self.cfg.command_grace_s:
             self._clear_command()
+
+    def _start_grab(self):
+        """The hand has moved with a fist: now (and only now) take hold of the window under the cursor. The window then follows
+        the hand from where the fist STARTED, so there is no lag from the first few pixels."""
+        ref = self._grab_pending
+        self._grab_pending = None
+        if ref is None:
+            return
+        pos = self.windows.grab()
+        if pos is not None:
+            self._grab = (ref[0], ref[1], pos[0], pos[1])
 
     def _edge(self, x, y):
         rect = self.windows.monitor_rect(x, y) or (self.cfg.screen_x, self.cfg.screen_y, self.cfg.screen_w, self.cfg.screen_h)
@@ -192,6 +208,7 @@ class Controller:
         return sample
 
     def _drop_window(self):
+        self._grab_pending = None
         if self._grab is not None:
             self.windows.release()
             self._grab = None
@@ -292,13 +309,20 @@ class Controller:
         self._last_seen = t
         act_pose = self._action(pose)
         shown = None
+        if act_pose in COMMANDS and self._action(self.stable) == "move_window":
+            if self._grab is None:
+                self._grab_pending = None                # no window is held yet (the hand has not moved): that fist was on its way
+                self.stable = NEUTRAL                    # to a thumbs pose, so nothing was grabbed and there is nothing to undo
+            else:
+                pose, act_pose = self.stable, "move_window"   # a thumb popping out of a window you are really dragging: ignored
         if act_pose in COMMANDS and not self.holding and t >= self._block_until:
             self._command_frame(pose, act_pose, t)      # thumbs-up / thumbs-down / L: a timed one-shot command
             shown, pose = pose, NEUTRAL                  # ...and the cursor, scroll and clicks do nothing meanwhile
             if self.stable != NEUTRAL:                   # stop at once: the hand is no longer steering the cursor
                 self._enter(NEUTRAL, landmarks, t)
                 self.stable = NEUTRAL
-        elif (act_pose in COMMANDS or act_pose == "move_window") and t < self._block_until and not self.holding:
+        elif ((act_pose in COMMANDS and t < self._block_until)
+              or (act_pose == "move_window" and t < max(self._block_until, self._grab_block_until))) and not self.holding:
             if pose == self._cmd_pose:
                 self._cmd_seen = t                       # still holding the pose that just fired: it stays "already fired"
             else:
@@ -338,6 +362,9 @@ class Controller:
             hx, hy = self._cursor_target(p, t)
             self.mouse.move(hx, hy)  # the cursor stays on the window it is dragging
             self._follow_os_cursor()
+            if self._grab is None and self._grab_pending is not None:
+                if math.hypot(hx - self._grab_pending[0], hy - self._grab_pending[1]) >= self.cfg.grab_move_px:
+                    self._start_grab()
             if self._grab is not None:
                 gx, gy, wx, wy = self._grab
                 self.windows.move_to(wx + hx - gx, wy + hy - gy)
@@ -376,18 +403,18 @@ class Controller:
         if new == "move_window":
             if old not in MOVING:
                 self._cursor = None                      # resync from the real cursor (relative mode)
-            pos = self.windows.grab()
-            if pos is not None:
-                p = self.point(landmarks)
-                self._filter.reset()
-                self._last_xy = None
-                if self.cfg.cursor_mode == "relative":
-                    if self._cursor is None:
-                        self._sync_cursor()
-                    hx, hy = self._cursor
-                else:
-                    hx, hy = self._map(p.x, p.y)
-                self._grab = (hx, hy, pos[0], pos[1])
+            p = self.point(landmarks)
+            self._filter.reset()
+            self._last_xy = None
+            if self.cfg.cursor_mode == "relative":
+                if self._cursor is None:
+                    self._sync_cursor()
+                hx, hy = self._cursor
+            else:
+                hx, hy = self._map(p.x, p.y)
+            self._grab_pending = (hx, hy)
+            if self.cfg.grab_move_px <= 0:
+                self._start_grab()                       # take hold at once (the old behaviour)
         if old in ("none", "scroll", "right_click", "move_window") and new in ("move", "drag"):
             self._filter.reset()  # no smoothing lag from a stale position
             self._last_xy = None

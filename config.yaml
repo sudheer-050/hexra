@@ -73,6 +73,10 @@ actions:
 command_hold_s: 0.5        # hold thumbs-up / thumbs-down this long
 close_hold_s: 1.5          # hold the L shape this long (longer on purpose: closing is the hardest to undo)
 command_cooldown_s: 0.8    # after a command, a fist cannot grab a window for this long
+# Accidental window grabs while making or leaving a thumbs pose:
+thumb_guard_s: 0.6         # after a thumbs pose is seen (even briefly), a fist cannot grab a window for this long
+grab_move_px: 30           # a fist only takes hold of a window once your hand has moved this far (screen pixels). A fist that stays
+                           # still (on its way to a thumbs-up, say) touches nothing, not even to un-maximise the window. 0 = grab at once
 
 # Snap: drag a window with a fist and let go while the cursor is at a screen edge. Left or right edge = that half of the
 # screen (split screen), top edge = maximise. A live hint appears while you are in the zone.

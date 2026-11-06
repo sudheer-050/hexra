@@ -15,6 +15,7 @@ def lm(x=0.5, y=0.5):
 
 
 def make(**kw):
+    kw.setdefault("grab_move_px", 0.0)      # these tests describe taking hold of a window at once; test_commands.py covers the deferred grab
     m = NullMouse()
     c = Controller(ControllerConfig(screen_w=1000, screen_h=1000, region=(0, 0, 1, 1), hold_frames=2, **kw), m, NullMover())
     return c, m
@@ -393,7 +394,7 @@ def test_two_scrolling_fingers_curling_does_not_become_a_fist_until_really_close
 
 def test_window_grab_needs_the_longer_hold():
     m = NullMouse()
-    cfg = ControllerConfig(screen_w=1000, screen_h=1000, region=(0, 0, 1, 1), hold_frames=2, grab_frames=5)
+    cfg = ControllerConfig(screen_w=1000, screen_h=1000, region=(0, 0, 1, 1), hold_frames=2, grab_frames=5, grab_move_px=0)
     c = Controller(cfg, m, NullMover())
     for i in range(4):
         c.step("fist", lm(), i / 30)

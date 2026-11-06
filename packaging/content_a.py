@@ -136,7 +136,8 @@ def part1():
             "<b>Aim first, then act.</b> Open palm to put the cursor on the target, then pinch (or make the fist).",
             "<b>Pinching does not push the click off target.</b> A click lands where the cursor was 0.15 s before the pinch began, "
             "unless you were really moving (more than 100 pixels), in which case it lands where you are.",
-            "<b>The fist is deliberate.</b> It needs index, middle and ring clearly folded for about 0.17 s. Half-curled fingers do not grab a window.",
+            "<b>The fist is deliberate.</b> It needs index, middle and ring clearly folded for about 0.17 s. Half-curled fingers do not grab a window. "
+            "And a fist only takes hold of a window <b>once your hand moves</b> (about 30 pixels): a fist that stays still, such as the one on the way to a thumbs-up, touches nothing, not even to un-maximise the window.",
             "<b>Dropping a window is also deliberate.</b> Holding a fist survives wobbles; the window is released only after about 0.33 s of clearly open hand. "
             "A click-drag needs about 0.2 s of a different pose to end.",
             "<b>Losing the hand</b> for less than 0.3 s (motion blur) does not release anything held. Longer than that releases the click or window.",
@@ -191,6 +192,8 @@ def part1():
                 ["release_frames", "6", "frames a different pose must persist to end a click-drag"],
                 ["grab_release_frames", "10", "frames (~0.33 s) to drop a grabbed window"],
                 ["command_hold_s / close_hold_s", "0.5 / 1.5", "seconds to hold thumbs-up or thumbs-down / the L shape before the command fires"],
+                ["grab_move_px", "30", "a fist takes hold of a window only after the hand has moved this far (screen pixels); 0 = at once"],
+                ["thumb_guard_s", "0.6", "after a thumbs pose is seen, a fist cannot grab a window for this long (a hand relaxing out of it)"],
                 ["command_cooldown_s", "0.8", "after a command, a fist cannot grab a window for this long"],
                 ["snap_edges / snap_edge_px", "true / 30", "snap a fist-dragged window released at a screen edge; how close to the edge counts, in pixels"],
                 ["dropout_grace_s", "0.3", "keep holding through brief tracking losses up to this long"],

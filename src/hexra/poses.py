@@ -67,6 +67,7 @@ class RuleRecognizer:
     THUMB_STRAIGHT, THUMB_LENGTH = 0.85, 0.50
     THUMB_VERTICAL = 0.60      # |sideways| <= this x |vertical| counts as pointing up/down (about 30 degrees)
     THUMB_VERTICAL_STAY = 0.85  # ...a little looser once the pose is already held, so it does not flicker
+    THUMB_NEAR_VERTICAL = 0.84  # a straight thumb within about 40 degrees of vertical is "rising": the fist is not a grab yet
     ELL_ANGLE = (75.0, 125.0)  # the angle between thumb and index finger for an "L": clearly sideways, not just a thumb held out
     THUMB_BONE_MIN = 0.04      # a thumb whose joints coincide has no usable direction (tracking dropout): ignored
 
@@ -96,7 +97,9 @@ class RuleRecognizer:
         elif self._pinched:
             pose = "click"
         elif fist_like:
-            pose = "fist"
+            # A fist whose thumb is straight and pointing up or down is on its way to (or from) a thumbs-up / thumbs-down:
+            # it must not start a window grab. "thumb_fist" is neutral: it does nothing.
+            pose = "thumb_fist" if self._thumb_rising(pts, size) else "fist"
         else:
             if all(ext.values()):
                 pose = "palm"
@@ -113,15 +116,10 @@ class RuleRecognizer:
         return pose
 
     def _thumb_pose(self, pts, size, straight, reach, ext, cur):
-        """thumb_up / thumb_down / ell, or None. Never starts while a fist is held: a thumb sticking out of a fist that is
-        dragging a window must not become a command."""
-        if self._last == "fist":
-            return None
-        if min(_d(pts, a, b) for a, b in ((1, 2), (2, 3), (3, 4))) / size < self.THUMB_BONE_MIN:
-            return None
-        thumb_straight = _straightness(pts, (1, 2, 3, 4))
-        vec = pts[4, :2] - pts[2, :2]
-        if thumb_straight < self.THUMB_STRAIGHT or float(np.linalg.norm(vec)) / size < self.THUMB_LENGTH:
+        """thumb_up / thumb_down / ell, or None. (A thumb that pops out of a fist that is dragging a window is the
+        controller's business: it keeps the window held unless the grab is brand new, see Controller.)"""
+        out, vec = self._thumb_state(pts, size)
+        if not out:
             return None
         held = self._last in ("thumb_up", "thumb_down")
         r_lim, s_lim = (self.FIST_REACH_STAY, self.FIST_STRAIGHT_STAY) if held else (self.FIST_REACH_ENTER, self.FIST_STRAIGHT_ENTER)
@@ -137,6 +135,19 @@ class RuleRecognizer:
                 if self.ELL_ANGLE[0] <= angle <= self.ELL_ANGLE[1]:
                     return "ell"
         return None
+
+    def _thumb_state(self, pts, size):
+        """(is the thumb out?, thumb vector from its base joint to its tip). Out = its bones form a straight line and it
+        reaches well away from the palm; a thumb whose joints coincide (a tracking dropout) is never out."""
+        vec = pts[4, :2] - pts[2, :2]
+        if min(_d(pts, a, b) for a, b in ((1, 2), (2, 3), (3, 4))) / size < self.THUMB_BONE_MIN:
+            return False, vec
+        straight = _straightness(pts, (1, 2, 3, 4))
+        return straight >= self.THUMB_STRAIGHT and float(np.linalg.norm(vec)) / size >= self.THUMB_LENGTH, vec
+
+    def _thumb_rising(self, pts, size) -> bool:
+        out, vec = self._thumb_state(pts, size)
+        return out and abs(vec[0]) <= self.THUMB_NEAR_VERTICAL * abs(vec[1])
 
     def predict_features(self, feats) -> str:
         return self.predict_points(np.asarray(feats, dtype=np.float32).reshape(21, 3))

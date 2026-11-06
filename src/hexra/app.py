@@ -59,7 +59,8 @@ def load_config(path: str) -> ControllerConfig:
     for key in ("min_cutoff", "beta", "deadzone_px", "lead_ms", "hold_frames", "grab_frames", "release_frames", "grab_release_frames", "dropout_grace_s",
                 "scroll_gain", "scroll_axis_lock", "rel_gain_min", "rel_gain_max", "rel_v_low", "rel_v_high",
                 "rel_softness", "rel_max_jump", "click_lookback_s", "click_snap_px",
-                "command_hold_s", "close_hold_s", "command_grace_s", "command_cooldown_s", "snap_edges", "snap_edge_px"):
+                "command_hold_s", "close_hold_s", "command_grace_s", "command_cooldown_s", "snap_edges", "snap_edge_px",
+                "grab_move_px", "thumb_guard_s"):
         if key in data:
             setattr(cfg, key, type(getattr(cfg, key))(data[key]))
     cfg.actions.update(data.get("actions", {}))

@@ -47,14 +47,22 @@ def test_pointing_is_not_an_l():
     assert RuleRecognizer().predict_points(hand(THUMB_TUCKED, index_up=True)) == "point"
 
 
-def test_a_thumb_out_of_a_held_fist_does_not_become_a_command():
+def test_the_recogniser_reports_a_thumbs_pose_even_right_after_a_fist():
+    """The controller (not the recogniser) decides whether a thumb popping out of a fist matters: see the grab tests below."""
     r = RuleRecognizer()
     assert r.predict_points(hand(THUMB_TUCKED)) == "fist"
-    for _ in range(5):
-        assert r.predict_points(hand(THUMB_UP)) == "fist"        # you are holding a fist: the thumb is ignored
-    assert r.predict_points(hand(THUMB_UP, index_up=True)) != "thumb_up"
-    r.predict_points(hand(THUMB_TUCKED, index_up=True))          # an open hand in between...
-    assert r.predict_points(hand(THUMB_UP)) == "thumb_up"        # ...and now a thumbs-up counts
+    assert r.predict_points(hand(THUMB_UP)) == "thumb_up"
+    assert r.predict_points(hand(THUMB_TUCKED)) == "fist"
+    assert r.predict_points(hand(THUMB_DOWN)) == "thumb_down"
+
+
+def test_a_fist_with_a_rising_thumb_is_neutral_not_a_grab():
+    """A fist whose thumb is straight and pointing up/down (but not yet a clean thumbs pose) must not start a window grab."""
+    tilted = rotated(hand(THUMB_UP), 36)                 # a little past the thumbs-up tolerance, still clearly rising
+    assert RuleRecognizer().predict_points(tilted) == "thumb_fist"
+    assert RuleRecognizer().predict_points(rotated(hand(THUMB_DOWN), 36)) == "thumb_fist"
+    for thumb in (THUMB_TUCKED, THUMB_SIDE, THUMB_DIAG):  # a tucked, sideways or diagonal thumb is still an ordinary fist
+        assert RuleRecognizer().predict_points(hand(thumb)) == "fist"
 
 
 def test_thumbs_up_survives_a_little_tilt_but_not_a_lot():
@@ -67,7 +75,7 @@ def test_thumbs_up_does_not_flicker_once_held():
     r = RuleRecognizer()
     assert r.predict_points(hand(THUMB_UP)) == "thumb_up"
     assert r.predict_points(rotated(hand(THUMB_UP), 33)) == "thumb_up"           # looser while already held
-    assert RuleRecognizer().predict_points(rotated(hand(THUMB_UP), 33)) == "fist"  # ...but it would not START there
+    assert RuleRecognizer().predict_points(rotated(hand(THUMB_UP), 33)) == "thumb_fist"  # ...but it would not START there (and is no grab either)
 
 
 # ---------------------------------------------------------------- the controller
@@ -78,6 +86,7 @@ def lm(x=0.5, y=0.5):
 
 
 def make(**kw):
+    kw.setdefault("grab_move_px", 0.0)      # most tests here take hold at once; the deferred-grab tests below set grab_move_px=30
     m, w = NullMouse(), NullMover()
     c = Controller(ControllerConfig(screen_w=1000, screen_h=1000, region=(0, 0, 1, 1), hold_frames=2, **kw), m, w)
     return c, m, w
@@ -259,3 +268,61 @@ def test_snap_uses_the_screen_under_the_cursor_not_the_whole_desktop():
     w.monitor = (500, 0, 500, 1000)                              # the cursor is on a screen that starts at x=500
     drag_and_release(c, 0.52, 0.5)                               # 520 px: inside THAT screen's left edge zone
     assert w.commands == ["snap:left"]
+
+
+# ---------------------------------------------------------------- accidental grabs while making or leaving a thumbs pose
+def test_a_fist_that_stays_still_takes_hold_of_nothing():
+    c, m, w = make(grab_move_px=30)
+    feed(c, "fist", 1.0, 0.0)
+    assert c.holding and not w.grabbed and w.position is None       # the window was not touched at all
+
+
+def test_a_fist_on_its_way_to_a_thumbs_up_is_not_a_grab():
+    c, m, w = make(grab_move_px=30)
+    t = feed(c, "fist", 0.4, 0.0)                                    # long enough to be a fist, the hand stays still
+    assert not w.grabbed
+    t = feed(c, "thumb_up", 0.2, t)                                  # the thumb comes up
+    assert not c.holding and w.position is None                      # nothing was grabbed, so nothing to undo
+    feed(c, "thumb_up", 0.5, t)
+    assert w.commands == ["maximize"]                                # and the thumbs-up works
+
+
+def test_a_fist_that_moves_does_take_hold_and_follows_from_where_it_started():
+    c, m, w = make(grab_move_px=30)
+    t = feed(c, "fist", 0.2, 0.0, x=0.2, y=0.5)
+    assert not w.grabbed
+    feed(c, "fist", 0.3, t, x=0.6, y=0.5)                            # the hand moves 400 px
+    assert w.grabbed
+    assert abs(w.position[0] - 400) < 25                             # the window caught up with the whole movement
+
+
+def test_a_window_that_is_really_being_dragged_is_not_dropped_by_a_thumb_popping_out():
+    c, m, w = make(grab_move_px=30)
+    t = feed(c, "fist", 0.2, 0.0, x=0.2, y=0.5)
+    t = feed(c, "fist", 0.3, t, x=0.7, y=0.5)
+    assert w.grabbed
+    t = feed(c, "thumb_up", 0.8, t, x=0.7, y=0.5)                    # a thumb pops out of a window you really are holding
+    assert w.grabbed and c.holding and w.commands == []
+    feed(c, "fist", 0.3, t, x=0.7, y=0.5)
+    assert w.grabbed                                                 # and it is still held when the thumb goes back
+
+
+def test_relaxing_out_of_a_thumbs_pose_does_not_grab_a_window():
+    c, m, w = make(grab_move_px=30)
+    t = feed(c, "thumb_up", 0.3, 0.0)                                # a thumbs-up that was not held long enough to fire
+    assert w.commands == []
+    t = feed(c, "fist", 0.4, t, x=0.3, y=0.5)                        # the hand relaxes through a fist, still moving
+    t = feed(c, "fist", 0.3, t, x=0.8, y=0.5)
+    assert not w.grabbed                                             # the guard: no grab right after a thumbs pose
+    t = feed(c, "palm", 0.3, t)
+    feed(c, "fist", 0.2, t, x=0.2, y=0.5)
+    t = feed(c, "fist", 0.3, t + 0.2, x=0.7, y=0.5)
+    assert w.grabbed                                                 # a deliberate fist and drag a moment later still grabs
+
+
+def test_an_ordinary_deliberate_grab_still_works():
+    c, m, w = make(grab_move_px=30)
+    t = feed(c, "palm", 0.3, 0.0, x=0.3, y=0.5)
+    t = feed(c, "fist", 0.2, t, x=0.3, y=0.5)
+    feed(c, "fist", 0.3, t, x=0.5, y=0.5)
+    assert w.grabbed
