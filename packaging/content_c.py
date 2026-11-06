@@ -23,7 +23,7 @@ def part3():
                 ["10", "Extra screens", "57"], ["11", "Precision, face lock, edge and line fixes", "61 to 78"], ["12", "Rotation and scroll-to-fist bugs", "80 to 83"],
                 ["13", "Window commands discussed; this guide and the installer", "83"],
                 ["14", "Choosing a name; the product becomes Hexra", "83"],
-                ["15", "Window commands built: thumbs-up/down, L close, edge snap", "109"]], [18, 120, 27])
+                ["15", "Window commands built: thumbs-up/down, L close, edge snap; the wave logo and window icons", "111"]], [18, 120, 27])
 
     s += phase("Phase 0: the starting point - gesture-mouse",
                "You shared a conversation and asked to read the project folder and complete its setup. After it was closed: 'tell me what to run'. "
@@ -162,7 +162,7 @@ def part3():
             "<b>Unsigned installer.</b> Windows SmartScreen and some antivirus programs will warn."])
 
     s += [P("15. Tests", H1)]
-    s += [P("109 automated tests, run with <font face='Courier'>.venv\\Scripts\\python -m pytest</font>. They need no camera: the controller, the recogniser and the "
+    s += [P("111 automated tests, run with <font face='Courier'>.venv\\Scripts\\python -m pytest</font>. They need no camera: the controller, the recogniser and the "
             "filters take plain numbers.")]
     s += table([["File", "Tests", "What it checks"],
                 ["test_control.py", "32", "debounce; moving poses start within 2 frames and clicks need the full hold; drag survives flicker and short dropout, ends after sustained release or long loss; "
@@ -181,6 +181,7 @@ def part3():
                 ["test_commands.py", "26", "thumbs-up, thumbs-down and L are recognised; an ordinary fist (thumb tucked, to the side or diagonal) never is; pointing is not an L; a thumb out of a held fist is ignored; "
                  "tilt tolerance and no flicker; a command fires once after its hold, again only after leaving the pose; close needs 1.5 s and shows progress; dropping the pose cancels; a flicker keeps progress; "
                  "the cursor does not move during a command; no command while a fist is held; no grab right after a command; remapping works; edge zones, left/right/top snap, corners, live hint, no snap when the hand is lost or snapping is off, snap uses the screen under the cursor"],
+                ["test_icon.py", "2", "the icon file is found; setting the window and taskbar icon never raises, whatever the window or platform"],
                 ["test_config.py", "4", "shipped config loads; a file with a byte-order mark loads; explicit values override the preset; unknown feel is rejected"]], [32, 12, 121])
 
     s += [PageBreak(), P("16. Building the installer and this guide", H1)]
@@ -191,7 +192,7 @@ def part3():
                  "Gives mediapipe empty stand-ins for matplotlib (which the program never uses) so that matplotlib can be left out."],
                 ["build_app.ps1", "PyInstaller command (run from the slim environment packaging/buildenv: mediapipe + plain opencv-python without the contrib extras, which only the face recogniser needed; the 30 MB video-file decoder is deleted because a webcam does not use it): console program, mediapipe collected in full, scikit-learn, scipy, pandas, pytest, matplotlib and PIL excluded"],
                 ["installer.py", "the wizard: folder choice, shortcuts, progress bar; silent mode /S /DIR= /NOSHORTCUTS; writes the uninstall entry in HKCU; keeps an existing config.yaml"],
-                ["make_icon.py", "draws app.ico"],
+                ["make_icons.py", "builds the logo files and app.ico from the master image assets/logo-original.png"],
                 ["pdf_lib.py, content_*.py, make_pdf.py", "this document"],
                 ["build_all.ps1", "runs: build app, stage models and config, make the PDF, zip the payload, build the single-file installer"]], [48, 117])
     s += [P("Rebuild", H3), code("cd <the project folder>\npowershell -ExecutionPolicy Bypass -File packaging\\build_all.ps1"),
