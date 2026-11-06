@@ -24,7 +24,8 @@ def part3():
                 ["13", "Window commands discussed; this guide and the installer", "83"],
                 ["14", "Choosing a name; the product becomes Hexra", "83"],
                 ["15", "Window commands built: thumbs-up/down, L close, edge snap; the wave logo and window icons", "111"],
-                ["16", "Accidental fist grabs fixed; no terminal window", "118"]], [18, 120, 27])
+                ["16", "Accidental fist grabs fixed; no terminal window", "118"],
+                ["17", "A fist no longer maximises: stricter thumbs-up, snap only when dragged into an edge", "121"]], [18, 120, 27])
 
     s += phase("Phase 0: the starting point - gesture-mouse",
                "You shared a conversation and asked to read the project folder and complete its setup. After it was closed: 'tell me what to run'. "
@@ -148,6 +149,15 @@ def part3():
                "(3) After any thumbs pose a fist cannot grab for 0.6 s. Separately, the installed program is now a windowed program with no terminal; a console opens only for uninstall, selftest, enroll and precision, and problems appear in a message box.",
                "118 tests (7 new, 3 rewritten). Same simulation after the fix: a grab started in 0.5%, a window moved in 0.5%, the command fired in 83% (limited by simulated holds shorter than 0.5 s). "
                "The windowed build was checked in a temporary copy: self-test passed, one visible window (the camera window), no console. Not tested on your real hand.")
+    s += phase("Phase 17: 'the fist is maximising the tab'",
+               "After testing 1.1.3 on a real hand: 'the fist is maximising the tab'.",
+               "Two causes were plausible from the log. (1) A thumbs-up was recognised for any straight, upright thumb, and a thumb simply resting along a fist is straight and upright too, so an ordinary fist could read as a thumbs-up and maximise after 0.5 s. "
+               "(2) Window title bars sit within 30 pixels of the top of the screen, so grabbing a window by its title bar and letting go there counted as dragging it to the top edge, which maximises. The log could not tell the two apart, because both print 'maximised'.",
+               "A thumbs-up now has to stick out beyond the fist (its tip at least 1.3 palm lengths along the hand's axis, so 1.15 once held); a thumbs-down has to point below the wrist. A thumb resting on a fist is now a neutral pose and does nothing. "
+               "A snap only counts if the cursor was away from the edge at some point during the drag (a window that starts at the edge and is let go there does not snap, and no hint is shown). "
+               "Log lines now say what fired: the pose in brackets for a command, '[snap top]' for a snap, and 'snapped to the top (maximised)'.",
+               "121 tests (3 new). Simulation, 300 samples each: a fist with a thumb resting along it was read as a thumbs-up 0% of the time; real thumbs-ups caught 100% facing the camera, 79% turned 20 degrees. "
+               "Not tested on your real hand: this is a fix for two likely causes, not a confirmed diagnosis.")
 
     s += [PageBreak(), P("13. The other projects on your PC", H1)]
     s += table([["Folder", "What it is", "Status"],
@@ -172,7 +182,7 @@ def part3():
             "<b>Unsigned installer.</b> Windows SmartScreen and some antivirus programs will warn."])
 
     s += [P("15. Tests", H1)]
-    s += [P("118 automated tests, run with <font face='Courier'>.venv\\Scripts\\python -m pytest</font>. They need no camera: the controller, the recogniser and the "
+    s += [P("121 automated tests, run with <font face='Courier'>.venv\\Scripts\\python -m pytest</font>. They need no camera: the controller, the recogniser and the "
             "filters take plain numbers.")]
     s += table([["File", "Tests", "What it checks"],
                 ["test_control.py", "32", "debounce; moving poses start within 2 frames and clicks need the full hold; drag survives flicker and short dropout, ends after sustained release or long loss; "

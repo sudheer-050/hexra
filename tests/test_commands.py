@@ -10,10 +10,11 @@ from hexra.windows import NullMover, snap_zone
 from test_control import hand_points
 
 # (landmarks 1..4 of the thumb) for a hand with the wrist at the origin and palm length 1; image y grows downwards
-THUMB_UP = [(0.25, -0.10), (0.45, -0.30), (0.50, -0.72), (0.50, -1.15)]
+THUMB_UP = [(0.25, -0.10), (0.45, -0.30), (0.50, -0.95), (0.50, -1.50)]     # sticks out well beyond the knuckles
 THUMB_DOWN = [(0.20, -0.05), (0.35, 0.10), (0.40, 0.45), (0.40, 0.85)]
 THUMB_SIDE = [(0.25, -0.10), (0.45, -0.30), (0.75, -0.34), (1.05, -0.36)]      # straight, out to the side
 THUMB_DIAG = [(0.25, -0.10), (0.45, -0.30), (0.70, -0.55), (0.95, -0.80)]      # straight, 45 degrees up
+THUMB_RESTING_UP = [(0.25, -0.10), (0.42, -0.30), (0.46, -0.62), (0.48, -0.95)]   # straight and upright, but only lying along the fist
 THUMB_TUCKED = [(0.20, -0.10), (0.40, -0.30), (0.50, -0.45), (0.45, -0.55)]    # resting against the fist
 
 
@@ -45,6 +46,14 @@ def test_an_ordinary_fist_is_never_a_command_however_the_thumb_rests():
 def test_pointing_is_not_an_l():
     assert RuleRecognizer().predict_points(hand(THUMB_DIAG, index_up=True)) == "point"       # thumb 45 degrees: not an L
     assert RuleRecognizer().predict_points(hand(THUMB_TUCKED, index_up=True)) == "point"
+
+
+def test_a_thumb_resting_along_the_fist_is_not_a_thumbs_up():
+    """A straight, upright thumb that stays within the fist (its tip at about knuckle height) is just a fist: it must not maximise."""
+    pose = RuleRecognizer().predict_points(hand(THUMB_RESTING_UP))
+    assert pose != "thumb_up" and pose != "thumb_down"
+    assert pose == "thumb_fist"                          # neutral: it does nothing, and it is no grab either
+    assert RuleRecognizer().predict_points(hand(THUMB_UP)) == "thumb_up"   # while a thumb that sticks out beyond the fist is
 
 
 def test_the_recogniser_reports_a_thumbs_pose_even_right_after_a_fist():
@@ -266,8 +275,30 @@ def test_snapping_can_be_switched_off():
 def test_snap_uses_the_screen_under_the_cursor_not_the_whole_desktop():
     c, m, w = make()
     w.monitor = (500, 0, 500, 1000)                              # the cursor is on a screen that starts at x=500
-    drag_and_release(c, 0.52, 0.5)                               # 520 px: inside THAT screen's left edge zone
+    t = feed(c, "fist", 0.4, 0.0, x=0.8, y=0.5)                  # grabbed in the middle of that screen
+    t = feed(c, "fist", 0.3, t, x=0.52, y=0.5)                   # dragged to 520 px: inside THAT screen's left edge zone
+    feed(c, "palm", 0.5, t, x=0.52, y=0.5)
     assert w.commands == ["snap:left"]
+
+
+def test_a_window_grabbed_at_the_edge_and_let_go_there_does_not_snap():
+    """A title bar sits within 30 px of the top of the screen: grabbing it and letting go there must not maximise."""
+    c, m, w = make()
+    t = feed(c, "fist", 0.4, 0.0, x=0.5, y=0.01)                 # the cursor starts in the top edge zone
+    t = feed(c, "fist", 0.3, t, x=0.52, y=0.012)
+    assert c.hint == ""                                          # no "release to snap" hint either
+    feed(c, "palm", 0.5, t, x=0.52, y=0.012)
+    assert w.commands == []
+
+
+def test_dragging_a_window_down_and_back_up_to_the_edge_does_snap():
+    c, m, w = make()
+    t = feed(c, "fist", 0.4, 0.0, x=0.5, y=0.01)
+    t = feed(c, "fist", 0.3, t, x=0.5, y=0.4)                    # away from the edge...
+    t = feed(c, "fist", 0.3, t, x=0.5, y=0.005)                  # ...and back into it
+    assert c.hint == "release to maximise"
+    feed(c, "palm", 0.5, t, x=0.5, y=0.005)
+    assert w.commands == ["snap:maximize"]
 
 
 # ---------------------------------------------------------------- accidental grabs while making or leaving a thumbs pose

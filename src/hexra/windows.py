@@ -192,7 +192,7 @@ class Win32Mover:
         if mode == "maximize":
             if self._u.GetWindowLongW(hwnd, self.GWL_STYLE) & self.WS_MAXIMIZEBOX:
                 self._u.ShowWindow(hwnd, self.SW_MAXIMIZE)
-                return f"maximised: {title}"
+                return f"snapped to the top (maximised): {title}"
             return None
         area = self._work_area(pt.x, pt.y)
         if area is None:

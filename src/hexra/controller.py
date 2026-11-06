@@ -99,6 +99,7 @@ class Controller:
         self._cmd_fired = False   # a held command fires once; the pose must be left before it can fire again
         self._block_until = 0.0   # a fist cannot grab a window until this time (just after a command)
         self._grab_block_until = 0.0   # ...and until this time (just after a thumbs pose was seen, even if it did not fire)
+        self._snap_armed = False   # the cursor has been away from the screen edge since this grab began (so a snap is deliberate)
         self._grab_pending = None  # (x, y) where a fist started, while it has not moved enough yet to take hold of a window
         self.stable = None
         self._cand = None
@@ -149,7 +150,7 @@ class Controller:
         if self.cmd_progress >= 1.0:
             self._cmd_fired = True
             result = getattr(self.windows, method)()
-            self.note = result or f"{label}: no window under the cursor to act on"
+            self.note = (f"{result} [{pose}]") if result else f"{label}: no window under the cursor to act on [{pose}]"
             self.cmd_progress, self.cmd_label = 0.0, ""
             self._block_until = t + self.cfg.command_cooldown_s
 
@@ -166,6 +167,7 @@ class Controller:
         if ref is None:
             return
         pos = self.windows.grab()
+        self._snap_armed = False
         if pos is not None:
             self._grab = (ref[0], ref[1], pos[0], pos[1])
 
@@ -175,8 +177,8 @@ class Controller:
 
     def _snap_on_release(self):
         """A window dragged with a fist and let go at a screen edge: left/right edge = that half, top edge = maximise."""
-        if not self.cfg.snap_edges or self._grab is None:
-            return
+        if not self.cfg.snap_edges or self._grab is None or not self._snap_armed:
+            return                                        # not dragged in from the open screen: a title bar near the top edge is not a snap
         pos = getattr(self.mouse, "position", None) or self._cursor
         if not pos:
             return
@@ -184,7 +186,7 @@ class Controller:
         if mode:
             result = self.windows.snap(mode)
             if result:
-                self.note = result
+                self.note = f"{result} [snap {mode}]"
 
     def point(self, landmarks):
         """The hand point that drives the cursor (an object with .x and .y)."""
@@ -369,6 +371,10 @@ class Controller:
                 gx, gy, wx, wy = self._grab
                 self.windows.move_to(wx + hx - gx, wy + hy - gy)
                 zone = self._edge(hx, hy) if self.cfg.snap_edges else None
+                if zone is None:
+                    self._snap_armed = True
+                elif not self._snap_armed:
+                    zone = None                          # it started at the edge and has not left it: no hint, no snap
                 self.hint = {"left": "release to snap left", "right": "release to snap right", "top": "release to maximise"}.get(zone, "")
         elif act == "scroll":
             x, y = self._scroll_filter(p.x, p.y, t)

@@ -87,7 +87,7 @@ def part2():
                 ["config.yaml", "settings (section 6)"],
                 ["run.bat", "development launcher: starts the app from the project's own Python environment and keeps the window open"],
                 ["pyproject.toml", "package definition and dependencies: mediapipe, opencv-python, numpy, scikit-learn, joblib, pynput, pyyaml; dev: pytest"],
-                ["tests\\", "118 automated tests in 9 files (section 15)"],
+                ["tests\\", "121 automated tests in 9 files (section 15)"],
                 ["models\\", "hand_landmarker.task and the two face .onnx models"],
                 ["data\\", "admin_face.npz (your fingerprints), last_run.log"],
                 ["archive\\multicam\\", "the removed multi-camera stereo code, tests and data (section 12, phase 8); not used by the app"],

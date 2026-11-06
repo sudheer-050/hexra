@@ -123,10 +123,10 @@ def part1():
           P("Three more poses act on the <b>window under the cursor</b>. Each is a <i>held</i> pose: a ring fills in the camera window, nothing happens until it is full, "
             "and dropping the pose cancels it.")]
     s += table([["Hand shape", "Hold", "What it does"],
-                ["<b>Thumbs-up</b>: a fist with the thumb straight up", "0.5 s", "<b>Maximise</b>; again to restore"],
+                ["<b>Thumbs-up</b>: a fist with the thumb sticking straight up, clearly beyond the fist (a thumb resting along a fist does not count)", "0.5 s", "<b>Maximise</b>; again to restore"],
                 ["<b>Thumbs-down</b>: a fist with the thumb straight down", "0.5 s", "<b>Minimise</b>"],
                 ["<b>L shape</b>: thumb out sideways, index finger up, the rest closed", "1.5 s (red ring)", "<b>Close</b>: the same as clicking the window's X, so the program can still ask to save"],
-                ["<b>Fist dragged to a screen edge, then opened</b>", "release", "<b>Snap</b>: left or right edge = that half of the screen, top edge = maximise. A live hint appears in the zone"]],
+                ["<b>Fist dragged INTO a screen edge, then opened</b>", "release", "<b>Snap</b>: left or right edge = that half of the screen, top edge = maximise. A live hint appears in the zone"]],
                [66, 28, 71])
     s += callout("Why these cannot be confused with the movement poses",
                  "No pose is shared. They never act on the desktop, the taskbar or Hexra's own windows; they cannot start while you hold a fist or a pinch (a thumb sticking out of a dragging fist is ignored); "

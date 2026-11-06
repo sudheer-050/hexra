@@ -67,6 +67,12 @@ class RuleRecognizer:
     THUMB_STRAIGHT, THUMB_LENGTH = 0.85, 0.50
     THUMB_VERTICAL = 0.60      # |sideways| <= this x |vertical| counts as pointing up/down (about 30 degrees)
     THUMB_VERTICAL_STAY = 0.85  # ...a little looser once the pose is already held, so it does not flicker
+    # A resting thumb lying along a fist is straight and points up too, so "straight and vertical" is not enough: a real
+    # thumbs-up sticks out BEYOND the fist. Measured along the hand's own axis (wrist to middle knuckle = 1.0 palm length):
+    # the tip must be this far past the knuckle line for thumbs-up (a little less once the pose is already held), and this
+    # far below the wrist for thumbs-down.
+    THUMB_UP_CLEAR, THUMB_UP_CLEAR_STAY = 1.30, 1.15
+    THUMB_DOWN_CLEAR, THUMB_DOWN_CLEAR_STAY = -0.10, 0.0
     THUMB_NEAR_VERTICAL = 0.84  # a straight thumb within about 40 degrees of vertical is "rising": the fist is not a grab yet
     ELL_ANGLE = (75.0, 125.0)  # the angle between thumb and index finger for an "L": clearly sideways, not just a thumb held out
     THUMB_BONE_MIN = 0.04      # a thumb whose joints coincide has no usable direction (tracking dropout): ignored
@@ -126,7 +132,13 @@ class RuleRecognizer:
         four_curled = all(reach[n] < r_lim and straight[n] < s_lim for n in ("index", "middle", "ring")) and cur["pinky"]
         tilt = self.THUMB_VERTICAL_STAY if held else self.THUMB_VERTICAL
         if four_curled and abs(vec[0]) <= tilt * abs(vec[1]):
-            return "thumb_up" if vec[1] < 0 else "thumb_down"       # image y grows downwards
+            axis = pts[9, :2] / (float(np.linalg.norm(pts[9, :2])) or 1.0)       # up along the hand
+            along = float(np.dot(pts[4, :2], axis)) / size                       # where the thumb tip is along that axis
+            if vec[1] < 0:                                                       # image y grows downwards: up
+                if along >= (self.THUMB_UP_CLEAR_STAY if held else self.THUMB_UP_CLEAR):
+                    return "thumb_up"
+            elif along <= (self.THUMB_DOWN_CLEAR_STAY if held else self.THUMB_DOWN_CLEAR):
+                return "thumb_down"
         if ext["index"] and cur["middle"] and cur["ring"] and cur["pinky"]:
             idx = pts[8, :2] - pts[5, :2]
             denom = float(np.linalg.norm(vec) * np.linalg.norm(idx))
