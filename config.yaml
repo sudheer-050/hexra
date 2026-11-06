@@ -107,3 +107,14 @@ face_lock:
   grace_s: 3.0           # you still count as present this long after the camera last recognised you
   check_every_s: 0.4     # how often a picture is checked (on a background thread: no cursor delay)
   require_face: true     # true: locked unless your face is seen. false: only an UNKNOWN face locks it
+
+# Attention gate: gestures only work while you are FACING THE SCREEN. Turn your head away to talk to a friend or look at your
+# phone and Hexra pauses by itself (the camera window says LOOKING AWAY); look back and it carries on. It does not identify
+# you (that is the face lock); it only asks whether a face is turned toward the camera. It uses a small face detector
+# (models/face_detection_yunet_2023mar.onnx, 233 KB). It assumes the camera is on or near the screen you look at.
+attention:
+  enabled: false         # true to switch it on
+  max_turn_deg: 35       # a head turned further than this counts as looking away (raise it if your camera sits to one side)
+  grace_s: 1.0           # ...but only once it has been turned away for this long, so a glance at the keyboard changes nothing
+  check_every_s: 0.2     # how often a picture is checked (on a background thread: no cursor delay)
+  require_face: true     # true: no face in the picture counts as looking away. false: only a clearly turned face does

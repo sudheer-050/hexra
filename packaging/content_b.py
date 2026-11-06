@@ -70,6 +70,8 @@ def part2():
                 ["<b>controller.py</b>", "the state machine: pose to action. Debounce, hold and release counts, relative cursor, acceleration, click snap-back, scroll with axis lock, window grab, drag, dropout grace. "
                  "No camera or OS calls in this file, so every behaviour is unit-tested."],
                 ["<b>filters.py</b>", "<b>OneEuroFilter</b> and <b>PointFilter</b> (x and y): the adaptive smoothing described in section 10."],
+                ["<b>attention.py</b>", "<b>Attention gate</b> (optional): gestures only while you face the screen. A 233 KB face detector (OpenCV YuNet) on a background thread estimates the head turn from the eye and nose landmarks; "
+                 "<b>AttentionGate</b> decides, with a grace period, and is fully testable without a camera."],
                 ["<b>gate.py</b>", "<b>AirGate</b>: in-the-air test plus asleep/awake state with the open-palm wake gesture."],
                 ["<b>face_lock.py</b>", "<b>FaceLock</b> and <b>OpenCVFaceAnalyzer</b>: YuNet detects faces, SFace turns each into 128 numbers, cosine similarity decides. "
                  "Background thread. Also saving/loading the admin file and the (now unneeded in the installed version) model download helper."],
@@ -87,7 +89,7 @@ def part2():
                 ["config.yaml", "settings (section 6)"],
                 ["run.bat", "development launcher: starts the app from the project's own Python environment and keeps the window open"],
                 ["pyproject.toml", "package definition and dependencies: mediapipe, opencv-python, numpy, scikit-learn, joblib, pynput, pyyaml; dev: pytest"],
-                ["tests\\", "121 automated tests in 9 files (section 15)"],
+                ["tests\\", "139 automated tests in 10 files (section 15)"],
                 ["models\\", "hand_landmarker.task and the two face .onnx models"],
                 ["data\\", "admin_face.npz (your fingerprints), last_run.log"],
                 ["archive\\multicam\\", "the removed multi-camera stereo code, tests and data (section 12, phase 8); not used by the app"],
@@ -171,6 +173,15 @@ def part2():
           P("Measured on the simulated articulated hand (the same model as section 10.3, 300 noisy samples per case): facing the camera, none of the six existing poses was ever read as a command, and the three real commands "
             "were caught 99 to 100% of the time. Turned up to 20 degrees and rolled 15, thumbs-up and thumbs-down were caught 79% of the time (about a fifth of fists are already misread as open palm at that noise level, "
             "which is a property of the simulation) and the L 96%; at 35 degrees of turn at most 2.3% of pointing frames looked like an L. These are simulation numbers, not measurements on your hand.", SMALL)]
+
+    s += [P("10.9 Attention gate", H2),
+          P("Optional (<font face='Courier'>attention: enabled: true</font>). A small face detector (OpenCV's YuNet, 233 KB, on the CPU) finds faces about five times a second on a background thread, so the cursor is never delayed. "
+            "The largest face is the user (anyone behind you is smaller). Its five landmarks give the head turn: the nose tip's offset from the midpoint of the eyes, measured along the line through the eyes (so a tilted head is not a turned head), "
+            "divided by the distance between the eyes, equals about 0.476 x tan(turn) for an average head (about 30 mm of nose depth and 63 mm between the eyes). Facing the camera is 0 degrees."),
+          P("The decision keeps the last time a face turned less than <b>max_turn_deg</b> (35) was seen. Gestures are allowed while that was within <b>grace_s</b> (1 s), so a glance at the keyboard or the phone does not interrupt a drag, "
+            "and looking away for longer pauses everything; looking back resumes at once. With <b>require_face</b> on, no face in the picture counts as looking away. "
+            "The camera window shows the live head turn ('facing the screen (turn 12 deg)'), which is also the way to tune max_turn_deg for your camera: it assumes the camera is on or near the screen you look at."),
+          P("It does not identify anyone (that is the face lock) and stores nothing; pictures are used in memory for the check and dropped.", SMALL)]
 
     s += [PageBreak(), P("11. Privacy and safety", H1)]
     s += B(["<b>No picture ever leaves your computer.</b> The program never sends data anywhere. The only network code in it is a helper that downloads a model file if one is missing, and the installer includes all three models, so it does not run. Pictures live in memory for one frame.",

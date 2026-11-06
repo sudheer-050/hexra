@@ -103,6 +103,16 @@ def selftest() -> int:
     tr.detect(np.zeros((480, 640, 3), np.uint8), 1)
     tr.close()
     say("hand tracker loaded and ran on an empty picture")
+    from hexra.attention import DEFAULTS as ATTENTION
+
+    model = Path(ATTENTION["model"])
+    if model.exists():
+        from hexra.attention import YuNetDetector
+
+        YuNetDetector(model).detect(np.zeros((480, 640, 3), np.uint8))
+        say("attention (head turn) detector loaded and ran on an empty picture")
+    else:
+        say("attention detector model not found: the attention gate is not available")
     say(f"pose recogniser and controller classes: {RuleRecognizer.__name__} {Controller.__name__}")
     say("SELFTEST OK")
     Path("data").mkdir(exist_ok=True)

@@ -9,7 +9,7 @@ $pk = "packaging"
 if ($LASTEXITCODE -ne 0) { throw "app build failed" }
 $stage = "$pk\dist\Hexra"
 New-Item -ItemType Directory -Force "$stage\models" | Out-Null
-Copy-Item models\hand_landmarker.task "$stage\models" -Force      # the face models are left out of this release
+Copy-Item models\hand_landmarker.task, models\face_detection_yunet_2023mar.onnx "$stage\models" -Force   # the 233 KB face detector is for the attention gate      # the face models are left out of this release
 # a clean config with the face lock switched OFF for this release; data\ (your face, your logs) is never copied
 $cfg = [IO.File]::ReadAllText((Resolve-Path config.yaml).Path)
 $cfg = [regex]::Replace($cfg, "(face_lock:\s*\r?\n\s*enabled:) true", '$1 false')

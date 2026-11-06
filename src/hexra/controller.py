@@ -72,6 +72,7 @@ class ControllerConfig:
     air: dict = field(default_factory=dict)  # options for AirGate (see gate.py)
     camera: dict = field(default_factory=dict)  # {"width": 640, "height": 480}
     face_lock: dict = field(default_factory=dict)  # options for the admin face lock (see face_lock.DEFAULTS)
+    attention: dict = field(default_factory=dict)  # options for the attention gate: gestures only while you face the screen (see attention.DEFAULTS)
 
 
 class Controller:

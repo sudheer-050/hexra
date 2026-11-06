@@ -27,7 +27,8 @@ def part3():
                 ["16", "Accidental fist grabs fixed; no terminal window", "118"],
                 ["17", "A fist no longer maximises: stricter thumbs-up, snap only when dragged into an edge", "121"],
                 ["18", "Antivirus false positive: bootloader rebuilt from source", "121"],
-                ["19", "My fist did not grab: the neutral thumb_fist guard removed", "121"]], [18, 120, 27])
+                ["19", "My fist did not grab: the neutral thumb_fist guard removed", "121"],
+                ["20", "Attention gate: only when you face the screen", "139"]], [18, 120, 27])
 
     s += phase("Phase 0: the starting point - gesture-mouse",
                "You shared a conversation and asked to read the project folder and complete its setup. After it was closed: 'tell me what to run'. "
@@ -176,6 +177,13 @@ def part3():
                "The guard is removed: a fist is a fist whatever its thumb does. Accidental grabs are still prevented by the deferred grab (a fist only takes hold of a window once the hand moves 30 pixels) and by the guard after thumbs poses; "
                "a thumbs-up still has to stick out beyond the fist. The installer exe is now also built with the custom bootloader.",
                "121 tests (the thumb_fist tests rewritten to expect an ordinary fist).")
+    s += phase("Phase 20: only when I see the screen",
+               "'Can I make this work only when I see the screen, and not when I am talking to my friend, facing my face away from my screen.'",
+               "Hexra only looked at the hand, so it kept obeying while you turned away. Hexra already carried a small face detector (for the face lock) that gives eye and nose landmarks, which is all a head-turn estimate needs.",
+               "A new optional attention gate (attention.py): a 233 KB YuNet face detector on a background thread, the head turn from the nose offset between the eyes (about 0.476 x tan(turn)), "
+               "gestures paused once you have looked more than 35 degrees away (or no face is seen) for more than 1 second, resumed the moment you look back. The camera window shows the live turn and LOOKING AWAY. "
+               "Off by default; the detector model ships in the installer; the self-test loads it.",
+               "139 tests (18 new), all with a fake detector and no camera. The 0.476 constant is average anatomy, not calibrated on your face: the live number in the camera window is how to tune max_turn_deg. Not tested on your real face yet.")
 
     s += [PageBreak(), P("13. The other projects on your PC", H1)]
     s += table([["Folder", "What it is", "Status"],
@@ -200,7 +208,7 @@ def part3():
             "<b>Unsigned installer.</b> Windows SmartScreen and some antivirus programs will warn."])
 
     s += [P("15. Tests", H1)]
-    s += [P("121 automated tests, run with <font face='Courier'>.venv\\Scripts\\python -m pytest</font>. They need no camera: the controller, the recogniser and the "
+    s += [P("139 automated tests, run with <font face='Courier'>.venv\\Scripts\\python -m pytest</font>. They need no camera: the controller, the recogniser and the "
             "filters take plain numbers.")]
     s += table([["File", "Tests", "What it checks"],
                 ["test_control.py", "32", "debounce; moving poses start within 2 frames and clicks need the full hold; drag survives flicker and short dropout, ends after sustained release or long loss; "
@@ -221,6 +229,8 @@ def part3():
                  "the cursor does not move during a command; no command while a fist is held; no grab right after a command; remapping works; edge zones, left/right/top snap, corners, live hint, no snap when the hand is lost or snapping is off, snap uses the screen under the cursor"],
                 ["test_commands.py (grab tests)", "6", "a fist that stays still takes hold of nothing; a fist on its way to a thumbs-up is not a grab; a moving fist takes hold and follows from where it started; "
                  "a window really being dragged is not dropped by a thumb popping out; relaxing out of a thumbs pose does not grab; an ordinary deliberate grab still works"],
+                ["test_attention.py", "18", "the head-turn estimate (0 facing, follows the real turn, left = right, a tilted head is not a turned head, face size irrelevant, a degenerate face is away); the biggest face is the user; "
+                 "the gate (waits for the first check, glances do not interrupt, longer looking away pauses and looking back resumes, configurable limit, no-face rules); the thread wrapper with a fake detector (rate limit, a failing detector does not crash, never blocks); off by default"],
                 ["test_icon.py", "2", "the icon file is found; setting the window and taskbar icon never raises, whatever the window or platform"],
                 ["test_config.py", "4", "shipped config loads; a file with a byte-order mark loads; explicit values override the preset; unknown feel is rejected"]], [32, 12, 121])
 

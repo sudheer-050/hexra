@@ -154,6 +154,11 @@ def part1():
             "past each edge so that a hand partly out of frame still counts. When the hand leaves the zone for one second, the program "
             "goes back to sleep and needs the one-second open-palm wake gesture. While you are holding a click-drag or a window, a more "
             "relaxed check applies so that reaching to a screen edge does not drop what you hold.")]
+    s += [P("Only when you look at the screen (optional)", H2),
+          P("Turn your head away to talk to a friend or look at your phone and Hexra pauses by itself; the camera window says LOOKING AWAY. Look back and it carries on. "
+            "Switch it on with <font face='Courier'>attention: enabled: true</font> in config.yaml. A quick glance at the keyboard (under 1 second) changes nothing. "
+            "The camera window shows your live head turn, for example 'facing the screen (turn 12 deg)'. If it pauses while you are looking at the screen (a camera mounted off to one side), "
+            "raise <font face='Courier'>max_turn_deg</font>. It does not identify you and saves nothing.")]
     s += [P("The face lock", H2),
           P("Gestures work only while the administrator's face has been recognised in the camera picture within the last 3 seconds. "
             "Looking down at the keyboard briefly is fine. Someone else's face does not unlock it. If your face is not found at all, "
@@ -194,6 +199,9 @@ def part1():
                 ["command_hold_s / close_hold_s", "0.5 / 1.5", "seconds to hold thumbs-up or thumbs-down / the L shape before the command fires"],
                 ["grab_move_px", "30", "a fist takes hold of a window only after the hand has moved this far (screen pixels); 0 = at once"],
                 ["thumb_guard_s", "0.6", "after a thumbs pose is seen, a fist cannot grab a window for this long (a hand relaxing out of it)"],
+                ["attention.enabled", "false", "true: gestures work only while you face the screen"],
+                ["attention.max_turn_deg / grace_s", "35 / 1.0", "head turn beyond which you count as looking away (degrees) / how long you must look away before gestures pause"],
+                ["attention.require_face", "true", "true: no face in the picture counts as looking away. false: only a clearly turned face does"],
                 ["command_cooldown_s", "0.8", "after a command, a fist cannot grab a window for this long"],
                 ["snap_edges / snap_edge_px", "true / 30", "snap a fist-dragged window released at a screen edge; how close to the edge counts, in pixels"],
                 ["dropout_grace_s", "0.3", "keep holding through brief tracking losses up to this long"],

@@ -48,7 +48,7 @@ def cover():
     return [Spacer(1, 40 * mm), logo, Spacer(1, 10 * mm), Paragraph("Hexra", t), Spacer(1, 6 * mm),
             Paragraph("Your hands, in control.", st), Spacer(1, 14 * mm),
             Paragraph("User guide, how it works inside, and the full story of how it was built: where it started, every change, and why.", sm),
-            Spacer(1, 60 * mm), Paragraph("Version 1.1.5 &nbsp;|&nbsp; Windows 10/11 &nbsp;|&nbsp; Python 3.10 &nbsp;|&nbsp; 121 automated tests", sm),
+            Spacer(1, 60 * mm), Paragraph("Version 1.2.0 &nbsp;|&nbsp; Windows 10/11 &nbsp;|&nbsp; Python 3.10 &nbsp;|&nbsp; 139 automated tests", sm),
             NextPageTemplate("main"), PageBreak()]
 
 

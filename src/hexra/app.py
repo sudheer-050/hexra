@@ -15,6 +15,7 @@ from pathlib import Path
 import cv2
 
 from .actions import NullMouse, PynputMouse
+from .attention import build as build_attention
 from .calibrate import draw_hand
 from .camera import ThreadedCamera
 from .controller import FEEL, Controller, ControllerConfig
@@ -67,6 +68,7 @@ def load_config(path: str) -> ControllerConfig:
     cfg.air = dict(data.get("air", {}))
     cfg.camera = dict(data.get("camera", {}))
     cfg.face_lock = dict(data.get("face_lock", {}))
+    cfg.attention = dict(data.get("attention", {}))
     return cfg
 
 
@@ -122,6 +124,11 @@ def main() -> None:
     else:
         log.info("Face lock OFF: anyone can use the gestures.")
 
+    attention = build_attention(cfg.attention)
+    if attention is not None:
+        log.info("Attention gate ON: gestures work only while you face the screen (head turned less than %d degrees).",
+                 attention.gate.max_turn_deg)
+
     mouse = NullMouse() if args.dry_run else PynputMouse()
     gate = AirGate(**cfg.air)
     ctl = Controller(cfg, mouse, NullMover() if args.dry_run else make_mover())
@@ -144,6 +151,7 @@ def main() -> None:
 
     fps_t, fps, lat_ms = time.monotonic(), 0.0, 0.0
     shown_note, note_until = "", 0.0
+    was_away = False
     try:
         while not stop.is_set():
             got = cap.read()
@@ -166,6 +174,15 @@ def main() -> None:
                 lock.submit(frame, t)                     # a background thread checks the picture; this never waits
                 if not lock.allowed(t):
                     lm = pose = None                      # not the admin: the hand is ignored
+            looking_away = False
+            if attention is not None:
+                attention.submit(frame, t)                # a background thread checks the picture; this never waits
+                looking_away = not attention.allowed(t)
+                if looking_away != was_away:
+                    log.info("Looking away: gestures paused" if looking_away else "Facing the screen again: gestures on")
+                    was_away = looking_away
+                if looking_away:
+                    lm = pose = None                      # you are not looking at the screen: the hand is ignored
             active = gate.update(lm, pose, t, holding=ctl.holding)
             stable = ctl.step(pose if active else None, lm if active else None, t, engaged.is_set())
             if ctl.note:
@@ -206,6 +223,11 @@ def main() -> None:
                             (0, 255, 0) if ok_now else (0, 0, 255), 1, cv2.LINE_AA)
                 if not ok_now:
                     cv2.putText(frame, "LOCKED", (10, h - 100), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3, cv2.LINE_AA)
+            if attention is not None:
+                cv2.putText(frame, attention.describe(t), (10, 72), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                            (0, 165, 255) if looking_away else (0, 255, 0), 1, cv2.LINE_AA)
+                if looking_away:
+                    cv2.putText(frame, "LOOKING AWAY - paused", (10, h - 160), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 165, 255), 3, cv2.LINE_AA)
             if ctl.hint:
                 cv2.putText(frame, ctl.hint.upper(), (10, h - 130), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
             if shown_note and time.monotonic() < note_until:
@@ -227,6 +249,8 @@ def main() -> None:
         display.close()
         if lock is not None:
             lock.close()
+        if attention is not None:
+            attention.close()
         cap.release()
         tracker.close()
         cv2.destroyAllWindows()
