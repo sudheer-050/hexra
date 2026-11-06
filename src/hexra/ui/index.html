@@ -3,29 +3,38 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
 <meta name="hexra-token" content="__TOKEN__">
 <title>Hexra</title>
 <link rel="icon" href="/logo.png">
 <link rel="stylesheet" href="/app.css">
 </head>
 <body>
-<div class="shell">
-  <aside class="side" aria-label="Sections">
+<div class="app">
+  <header class="top">
     <div class="brand"><img src="/logo.png" alt=""><span>Hexra</span></div>
-    <nav id="nav"></nav>
-    <div id="cam-slot-side"><section class="cam" id="cam-card" aria-label="Camera and controls">
-      <div class="cam-view"><img id="cam" alt="Live camera view with the detected hand" hidden><div id="cam-off" class="cam-off">Camera is off</div></div>
-      <div class="cam-status" id="cam-status"><span id="cam-chip" class="chip neutral">Off</span><span id="cam-text" class="small muted"></span></div>
-      <p id="cam-note" class="small cam-note" hidden></p>
-      <div class="cam-btns"><button id="cam-start" class="btn primary">Start Hexra</button><button id="cam-toggle" class="btn" hidden>Pause</button></div>
-      <label class="switch-row cam-try"><input type="checkbox" id="cam-dry"> Try it: show poses, never move the mouse</label>
-    </section></div>
-    <div class="side-foot">
-      <button id="save" class="btn primary wide" disabled>Save changes</button>
-      <p class="muted small"><span class="dot"></span> On your device<br>Private by design<br>Settings saved locally<br>Closing this window keeps Hexra running in the tray</p>
-    </div>
-  </aside>
-  <main class="main" id="main" tabindex="-1"></main>
+    <nav id="nav" aria-label="Sections"></nav>
+    <button id="save" class="btn accent" disabled>Save changes</button>
+  </header>
+  <div class="wrap">
+    <section class="stage" aria-label="Camera and controls">
+      <div id="cam-slot-side"><div class="cam" id="cam-card">
+        <div class="cam-view">
+          <img id="cam" alt="Live camera view with the detected hand" hidden>
+          <div id="cam-off" class="cam-off">Camera is off</div>
+          <div class="hud" id="cam-status" hidden><span id="cam-chip" class="chip neutral">Off</span><span id="cam-text" class="hud-text"></span></div>
+          <p id="cam-note" class="cam-note" hidden></p>
+        </div>
+        <div class="cam-ctl">
+          <button id="cam-start" class="btn accent">Start Hexra</button>
+          <button id="cam-toggle" class="btn" hidden>Pause</button>
+          <label class="switch-row cam-try"><input type="checkbox" id="cam-dry"> Try it: show poses, never move the mouse</label>
+          <span class="cam-hint"><span class="dot"></span> On your device · closing this window keeps Hexra in the tray</span>
+        </div>
+      </div></div>
+    </section>
+    <main class="insp" id="main" tabindex="-1"></main>
+  </div>
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script src="/app.js"></script>

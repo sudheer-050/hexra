@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "project": {
+    "name": "hexra",
+    "productType": "desktop app (local web UI)",
+    "stack": [
+      "vanilla HTML/CSS/JS",
+      "Python"
+    ]
+  },
+  "sources": {
+    "tokens": [
+      "src/hexra/ui/app.css"
+    ],
+    "components": [],
+    "assets": [
+      "assets"
+    ],
+    "instructions": []
+  },
+  "design": {
+    "colorMode": "unknown",
+    "colors": {},
+    "typography": {},
+    "spacing": {},
+    "radius": {},
+    "shadows": {},
+    "motion": {},
+    "density": "unknown"
+  },
+  "components": {
+    "installed": [],
+    "preferredPrimitives": [],
+    "patterns": []
+  },
+  "constraints": {
+    "must": [],
+    "avoid": []
+  },
+  "decisions": [
+    {
+      "date": "2026-11-06",
+      "choice": "Cockpit (dark, camera-first)",
+      "why": "Tune settings while watching the live camera: big camera stage left, settings inspector right, tabs along the top.",
+      "rejected": [
+        "Calm (light sidebar, sticky save bar)",
+        "Board (status tiles, expandable rows, floating camera)"
+      ],
+      "references": [
+        "21st: Settings Sidebar Layout 28366",
+        "21st: Settings Card with Sidebar 25323",
+        "21st: Command Palette 40104"
+      ]
+    }
+  ],
+  "evidence": [],
+  "generatedAt": "2026-11-06T18:31:39.051Z"
+}

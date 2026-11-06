@@ -33,7 +33,8 @@ def part3():
                 ["22", "One application: settings, live camera and controls in a single window", "173"],
                 ["23", "Two cameras, fused", "196"],
                 ["24", "Runs in the system tray", "199"],
-                ["25", "Start with Windows", "202"]], [18, 120, 27])
+                ["25", "Start with Windows", "202"],
+                ["26", "Redesign: the Cockpit", "202"]], [18, 120, 27])
 
     s += phase("Phase 0: the starting point - gesture-mouse",
                "You shared a conversation and asked to read the project folder and complete its setup. After it was closed: 'tell me what to run'. "
@@ -227,6 +228,13 @@ def part3():
                "A separate setting, Start hand control automatically (Startup page, off by default), also switches the camera and control on at launch. Uninstalling removes the entry. "
                "If a tray icon cannot be made the window still opens, so Hexra is never invisible at login.",
                "202 tests (3 new, using their own registry key, never the real Run key).")
+    s += phase("Phase 26: redesign with 21st.dev",
+               "'Can you redesign the application using the 21st.dev connector?' -> three directions were shown -> 'A: Cockpit'.",
+               "The window was a light sidebar app with the camera squeezed into the sidebar. When tuning a setting you want to watch your hand, not a thumbnail.",
+               "21st.dev was searched for settings, dashboard and command-palette references (its AI generation is not enabled on the plan, so the previews were built by hand from those references). "
+               "Three directions were compared (Cockpit, Calm, Board) and you chose the Cockpit: a dark window with the tabs along the top, the camera as a large stage on the left with the status on it (Controlling, pose, fps, fused), "
+               "and the settings as an inspector on the right. Nothing was removed: every page, setting, preset, the tray and start-with-Windows are the same.",
+               "202 tests; only the look changed (index.html, app.css and the tab labels in app.js). Checked in screenshots of the real app on the Overview, Cursor and Camera pages.")
 
     s += [PageBreak(), P("13. The other projects on your PC", H1)]
     s += table([["Folder", "What it is", "Status"],

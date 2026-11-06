@@ -164,7 +164,7 @@ function overview() {
       h("b", { style: "display:flex;gap:8px;align-items:center" }, icon(p.icon), p.label), h("span", {}, p.desc));
   });
   return [...header("Make Hexra yours.", "Every setting in one place, explained in plain words."),
-    h("div", { class: "card" }, h("div", { class: "row" }, h("div", {}, h("h2", {}, state.eng.running ? "Hexra is running" : "Hexra is not running"), h("p", { class: "muted", style: "margin:2px 0 0" }, state.eng.running ? "Saving a change restarts Hexra for a moment so it takes effect at once." : "Press Start Hexra under the camera in the sidebar.")))),
+    h("div", { class: "card" }, h("div", { class: "row" }, h("div", {}, h("h2", {}, state.eng.running ? "Hexra is running" : "Hexra is not running"), h("p", { class: "muted", style: "margin:2px 0 0" }, state.eng.running ? "Saving a change restarts Hexra for a moment so it takes effect at once." : "Press Start Hexra under the camera.")))),
     h("div", { class: "card" }, h("h2", {}, "Start from a preset"), h("p", { class: "muted", style: "margin:0 0 12px" }, "A preset only changes a few settings. You can fine-tune everything afterwards."), h("div", { class: "grid g4" }, presets)),
     startupCard(),
     h("div", { class: "card" }, h("h2", {}, "Housekeeping"), h("div", { class: "tools", style: "margin-top:10px" },
@@ -236,12 +236,14 @@ function render(keepScroll) {
 }
 function persistAdv() { try { localStorage.setItem("hexra-advanced", state.advanced ? "1" : "0"); } catch (e) {} }
 
+const SHORT = { cursor: "Cursor", clicks: "Clicks", windows: "Windows", gestures: "Gestures", presence: "Presence", camera: "Camera", general: "Startup" };
 function renderNav() {
   const ch = changedIds();
-  const items = [["overview", "Overview", "home"], ...state.schema.groups.map(g => [g.id, g.label, g.icon]), ["activity", "Activity", "pulse"]];
+  const ordered = [...state.schema.groups.filter(g => g.id !== "general"), ...state.schema.groups.filter(g => g.id === "general")];   // Startup after the tuning pages
+  const items = [["overview", "Overview", "home"], ...ordered.map(g => [g.id, g.label, g.icon]), ["activity", "Activity", "pulse"]];
   nav.replaceChildren(...items.map(([id, label, ic]) => {
     const n = id === "overview" || id === "activity" ? 0 : state.schema.groups.find(g => g.id === id).settings.filter(s => ch.includes(s.id)).length;
-    return h("button", { "aria-current": state.page === id && !state.q ? "page" : "false", onclick: () => { state.page = id; state.q = ""; render(false); main.scrollTop = 0; main.focus(); } }, icon(ic), label, n ? h("span", { class: "badge-n" }, n) : null);
+    return h("button", { "aria-current": state.page === id && !state.q ? "page" : "false", onclick: () => { state.page = id; state.q = ""; render(false); main.scrollTop = 0; main.focus(); } }, SHORT[id] || label, n ? h("span", { class: "badge-n" }, n) : null);
   }));
 }
 function updateSave() {
