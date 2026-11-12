@@ -4,6 +4,10 @@ $ErrorActionPreference = "Stop"
 $py = ".venv\Scripts\python.exe"
 $pk = "packaging"
 
+# Keep every logo consumer in sync with the transparent master before packaging.
+& $py "$pk\make_icons.py"
+if ($LASTEXITCODE -ne 0) { throw "icon generation failed" }
+
 # 1. the program
 & powershell -NoProfile -File "$pk\build_app.ps1"
 if ($LASTEXITCODE -ne 0) { throw "app build failed" }

@@ -303,7 +303,7 @@ def part3():
                  "Gives mediapipe empty stand-ins for matplotlib (which the program never uses) so that matplotlib can be left out."],
                 ["build_app.ps1", "PyInstaller command (run from the slim environment packaging/buildenv: mediapipe + plain opencv-python without the contrib extras, which only the face recogniser needed; the 30 MB video-file decoder is deleted because a webcam does not use it): console program, mediapipe collected in full, scikit-learn, scipy, pandas, pytest, matplotlib and PIL excluded"],
                 ["installer.py", "the wizard: folder choice, shortcuts, progress bar; silent mode /S /DIR= /NOSHORTCUTS; writes the uninstall entry in HKCU; keeps an existing config.yaml"],
-                ["make_icons.py", "builds the logo files and app.ico from the master image assets/logo-original.png"],
+                ["make_icons.py", "builds the logo files and app.ico from assets/logo-hand-cursor-master.png, preserving transparency"],
                 ["pdf_lib.py, content_*.py, make_pdf.py", "this document"],
                 ["build_bootloader.ps1", "rebuilds PyInstaller's bootloader (the small launcher inside Hexra.exe) from source with a portable MinGW-w64 gcc (w64devkit, checked against GitHub's published sha256) and installs it into packaging/buildenv. "
                  "The compiler (about 700 MB) lives in packaging/toolchain, which is not in git"],
